@@ -1,19 +1,25 @@
+
 "use client";
 
-import { signIn } from "next-auth/react";
+import { signIn, getSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { ui } from "@/lib/ui";
 
-// Only allow same-site paths, never "//evil.com" or full URLs.
+// Only allow same-site paths.
 function safeCallback(raw: string | null) {
-  return raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : "/";
+  return raw && raw.startsWith("/") && !raw.startsWith("//")
+    ? raw
+    : "/";
 }
 
 export function LoginForm() {
   const router = useRouter();
-  const callbackUrl = safeCallback(useSearchParams().get("callbackUrl"));
+  const callbackUrl = safeCallback(
+    useSearchParams().get("callbackUrl")
+  );
+
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -21,18 +27,38 @@ export function LoginForm() {
     e.preventDefault();
     setPending(true);
     setError(null);
+
     const fd = new FormData(e.currentTarget);
+
     const res = await signIn("credentials", {
       identifier: String(fd.get("identifier") ?? ""),
       password: String(fd.get("password") ?? ""),
       redirect: false,
     });
+
     if (!res?.ok) {
       setPending(false);
       setError("Wrong phone/email or password.");
       return;
     }
-    router.push(callbackUrl);
+
+    // Get the logged-in user's role.
+    const session = await getSession();
+    const role = session?.user?.role;
+
+    // Choose the correct dashboard.
+    const roleDestination =
+      role === "ADMIN"
+        ? "/admin"
+        : role === "SELLER"
+          ? "/seller"
+          : "/";
+
+    // Respect an existing protected-page callback.
+    const destination =
+      callbackUrl !== "/" ? callbackUrl : roleDestination;
+
+    router.push(destination);
     router.refresh();
   }
 
@@ -51,6 +77,7 @@ export function LoginForm() {
           className={ui.input}
         />
       </div>
+
       <div>
         <label htmlFor="password" className={ui.label}>
           Password
@@ -64,14 +91,21 @@ export function LoginForm() {
           className={ui.input}
         />
       </div>
+
       {error && (
         <p role="alert" className={ui.fieldError}>
           {error}
         </p>
       )}
-      <button type="submit" disabled={pending} className={`${ui.button} w-full`}>
+
+      <button
+        type="submit"
+        disabled={pending}
+        className={`${ui.button} w-full`}
+      >
         {pending ? "Logging in…" : "Log in"}
       </button>
+
       <p className="text-center text-sm text-stone-600">
         New here?{" "}
         <Link href="/register" className={ui.link}>

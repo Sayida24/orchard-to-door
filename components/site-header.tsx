@@ -7,7 +7,7 @@ import { SignOutButton } from "./sign-out-button";
 // The logo renders instantly; the user menu reads the session, so it streams in.
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-10 border-b border-stone-200 bg-white/90 backdrop-blur">
+    <header className="relative z-10 w-full border-b border-stone-200 bg-white">
       <div className="mx-auto flex h-16 w-full max-w-5xl items-center justify-between gap-3 px-4">
         <Link href="/" className="text-xl font-extrabold tracking-tight text-stone-900">
           🥭 Orchiva
