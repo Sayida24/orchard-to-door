@@ -1,0 +1,191 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  CUSTOMER
+  SELLER
+  ADMIN
+}
+
+enum BatchStatus {
+  OPEN
+  SOLD_OUT
+  CLOSED
+}
+
+enum OrderStatus {
+  PLACED
+  PACKED
+  DISPATCHED
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH_ON_DELIVERY
+  BKASH
+  NAGAD
+  CARD
+}
+
+enum AiStatus {
+  PENDING
+  CLEAN
+  DEFECT_FOUND
+}
+
+enum ComplaintStatus {
+  OPEN
+  APPROVED
+  REJECTED
+}
+
+// What the admin approved for a complaint (FR-21, FR-25)
+enum ComplaintResolution {
+  REPLACEMENT
+  REFUND
+}
+
+model User {
+  id            String         @id @default(cuid())
+  name          String
+  phone         String         @unique
+  email         String?        @unique
+  passwordHash  String
+  role          Role           @default(CUSTOMER)
+  createdAt     DateTime       @default(now())
+  orchards      Orchard[]      @relation("SellerOrchards")
+  batches       Batch[]        @relation("SellerBatches")
+  orders        Order[]        @relation("CustomerOrders")
+  complaints    Complaint[]
+  notifications Notification[]
+}
+
+model Orchard {
+  id          String   @id @default(cuid())
+  name        String
+  location    String
+  description String?
+  videoUrl    String?
+  photoUrls   String[]
+  createdAt   DateTime @default(now())
+  sellerId    String
+  seller      User     @relation("SellerOrchards", fields: [sellerId], references: [id])
+  batches     Batch[]
+}
+
+model Variety {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  seasonStart Int?
+  seasonEnd   Int?
+  taste       String?
+  bestUse     String?
+  batches     Batch[]
+}
+
+model Batch {
+  id              String      @id @default(cuid())
+  harvestDate     DateTime
+  totalKg         Float
+  availableKg     Float
+  pricePerKg      Float
+  harvestVideoUrl String?
+  spinImageUrls   String[]
+  status          BatchStatus @default(OPEN)
+  closesAt        DateTime?
+  createdAt       DateTime    @default(now())
+  orchardId       String
+  orchard         Orchard     @relation(fields: [orchardId], references: [id])
+  varietyId       String
+  variety         Variety     @relation(fields: [varietyId], references: [id])
+  sellerId        String
+  seller          User        @relation("SellerBatches", fields: [sellerId], references: [id])
+  orders          Order[]
+}
+
+model Order {
+  id             String        @id @default(cuid())
+  boxSizeKg      Float
+  isGiftBox      Boolean       @default(false)
+  totalPrice     Float
+  deliveryFee    Float         @default(0)
+  address        String
+  deliverySlot   String?
+  deliveryAreaId String?
+  deliveryArea   DeliveryArea? @relation(fields: [deliveryAreaId], references: [id])
+  paymentMethod  PaymentMethod @default(CASH_ON_DELIVERY)
+  status         OrderStatus   @default(PLACED)
+  createdAt      DateTime      @default(now())
+  packedAt       DateTime?
+  dispatchedAt   DateTime?
+  deliveredAt    DateTime?
+  customerId     String
+  customer       User          @relation("CustomerOrders", fields: [customerId], references: [id])
+  batchId        String
+  batch          Batch         @relation(fields: [batchId], references: [id])
+  box            Box?
+  complaints     Complaint[]
+}
+
+model Box {
+  id                 String    @id @default(cuid())
+  qrCode             String    @unique
+  photoUrls          String[]
+  model3dUrl         String?
+  weightKg           Float?
+  scanCount          Int       @default(0)
+  createdAt          DateTime  @default(now()) // QR label printed
+  packedAt           DateTime? // set when the label is linked to an order
+  aiStatus           AiStatus  @default(PENDING)
+  aiHealthyCount     Int?
+  aiDefectCount      Int?
+  aiDetections       Json?
+  annotatedPhotoUrls String[]
+  aiCheckedAt        DateTime?
+  // Optional so QR labels can be pre-printed; the seller scans one at packing (FR-17)
+  orderId            String?   @unique
+  order              Order?    @relation(fields: [orderId], references: [id])
+}
+
+model Complaint {
+  id         String               @id @default(cuid())
+  message    String
+  photoUrls  String[]
+  status     ComplaintStatus      @default(OPEN)
+  resolution ComplaintResolution?
+  adminNote  String?
+  resolvedAt DateTime?
+  createdAt  DateTime             @default(now())
+  orderId    String
+  order      Order                @relation(fields: [orderId], references: [id])
+  customerId String
+  customer   User                 @relation(fields: [customerId], references: [id])
+}
+
+// Delivery charge by area (FR-10); Dhaka zones first
+model DeliveryArea {
+  id       String  @id @default(cuid())
+  name     String  @unique
+  fee      Float
+  isActive Boolean @default(true)
+  orders   Order[]
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  message   String
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+}
+
