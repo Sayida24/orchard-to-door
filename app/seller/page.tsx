@@ -1,27 +1,28 @@
+
 import { Suspense } from "react";
 import { requireUser } from "@/lib/auth";
-import { ui } from "@/lib/ui";
+import { SellerDashboard } from "@/components/seller-dashboard";
 
-// Placeholder: batch listing and packing arrive in days 6–8 and 14–15.
 export default function SellerHome() {
   return (
-    <main className={ui.page}>
-      <h1 className="mb-4 text-2xl font-bold">Seller</h1>
-      <Suspense fallback={<p className="text-stone-500">Loading…</p>}>
-        <SellerWelcome />
-      </Suspense>
-    </main>
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-stone-50 p-8">
+          <p className="text-stone-500">
+            Loading your mango seller dashboard...
+          </p>
+        </main>
+      }
+    >
+      <SellerContent />
+    </Suspense>
   );
 }
 
-async function SellerWelcome() {
+async function SellerContent() {
   const user = await requireUser(["SELLER", "ADMIN"]);
+
   return (
-    <div className={ui.card}>
-      <p className="font-semibold">Welcome, {user.name}.</p>
-      <p className="mt-1 text-sm text-stone-600">
-        Listing harvest batches and packing orders will appear here.
-      </p>
-    </div>
+    <SellerDashboard sellerName={user.name ?? "Seller"} />
   );
 }
