@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Suspense } from "react";
 import { Role } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
@@ -14,11 +13,8 @@ const roleBadge: Record<Role, string> = {
 
 export default function AdminUsersPage() {
   return (
-    <main className={ui.page}>
-      <Link href="/admin" className={`${ui.link} text-sm`}>
-        ← Admin
-      </Link>
-      <h1 className="mb-4 mt-2 text-2xl font-bold">Users and roles</h1>
+    <main>
+      <h1 className="mb-4 text-2xl font-bold">Users and roles</h1>
       <Suspense fallback={<p className="text-stone-500">Loading users…</p>}>
         <UserList />
       </Suspense>
