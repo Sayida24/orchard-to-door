@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard, Sprout, Package, ScanLine, QrCode,
   Plus, Search, Bell, ChevronRight, Leaf, Truck,
   CheckCircle2, Clock, AlertTriangle, Eye, Menu,
+  Upload, ImagePlus, Film,
 } from "lucide-react";
 
-type Tab = "Overview" | "Harvest batches" | "Orders & packing" | "AI inspection" | "QR verification";
+type Tab = "Overview" | "Harvest batches" | "Orders & packing" | "AI inspection" | "QR verification" | "Orchard media";
 
 const batches = [
   { id: "MB-2026-041", variety: "Himsagar", orchard: "Rajshahi Orchard", harvest: "05 Nov 2026", quantity: "240 kg", status: "Available", price: "৳120/kg" },
@@ -27,6 +28,7 @@ const nav: { name: Tab; icon: typeof LayoutDashboard }[] = [
   { name: "Orders & packing", icon: Package },
   { name: "AI inspection", icon: ScanLine },
   { name: "QR verification", icon: QrCode },
+  { name: "Orchard media", icon: Upload },
 ];
 
 function Status({ value }: { value: string }) {
@@ -58,7 +60,33 @@ export function SellerDashboard({ sellerName }: { sellerName: string }) {
   const [search, setSearch] = useState("");
   const [inspection, setInspection] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [videoPreview, setVideoPreview] = useState<string | null>(null);
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
+  useEffect(() => {
+  if (!videoPreview) return;
 
+  return () => {
+    URL.revokeObjectURL(videoPreview);
+  };
+}, [videoPreview]);
+
+useEffect(() => {
+    return () => {
+      photoPreviews.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [photoPreviews]);
+
+  const handleVideoChange = (file: File | undefined) => {
+    setVideoPreview(file ? URL.createObjectURL(file) : null);
+  };
+
+  const handlePhotoChange = (files: FileList | null) => {
+    const urls = files
+      ? Array.from(files).map((file) => URL.createObjectURL(file))
+      : [];
+
+    setPhotoPreviews(urls);
+  };
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900">
       <div className="mx-auto flex max-w-[1500px]">
@@ -158,6 +186,116 @@ export function SellerDashboard({ sellerName }: { sellerName: string }) {
                 <div className="rounded-2xl border border-stone-200 bg-white p-6"><h2 className="font-bold">Box journey</h2><div className="mt-5 space-y-5"><div className="flex gap-3"><CheckCircle2 className="text-emerald-600" /><div><p className="text-sm font-semibold">Orchard origin</p><p className="text-xs text-stone-500">Rajshahi Orchard · Himsagar mangoes</p></div></div><div className="flex gap-3"><CheckCircle2 className="text-emerald-600" /><div><p className="text-sm font-semibold">Harvest batch</p><p className="text-xs text-stone-500">MB-2026-041 · 05 November 2026</p></div></div><div className="flex gap-3"><Clock className="text-amber-600" /><div><p className="text-sm font-semibold">Quality inspection</p><p className="text-xs text-stone-500">Awaiting real inspection integration</p></div></div><div className="flex gap-3"><Package className="text-stone-400" /><div><p className="text-sm font-semibold">Box packing</p><p className="text-xs text-stone-500">5 kg mango box · Sample record</p></div></div></div></div>
               </div>
             </>}
+                        
+
+            {active === "Orchard media" && <>
+              <div className="mb-6">
+                <h1 className="text-2xl font-bold">Orchard media</h1>
+                <p className="mt-1 text-sm text-stone-500">
+                  Add orchard videos and mango photos to showcase your harvest.
+                </p>
+              </div>
+
+              <div className="grid gap-6 lg:grid-cols-2">
+                <div className="rounded-2xl border border-stone-200 bg-white p-6">
+                  <div className="flex items-center gap-2">
+                    <Film className="text-amber-700" />
+                    <h2 className="font-bold">Orchard video</h2>
+                  </div>
+                  <p className="mt-2 text-sm text-stone-500">
+                    Select a video showing your mango orchard or harvest.
+                  </p>
+                  <label className="mt-5 block cursor-pointer rounded-xl border-2 border-dashed border-stone-300 p-8 text-center hover:bg-stone-50">
+                    <Upload className="mx-auto text-stone-500" size={30} />
+                    <span className="mt-3 block text-sm font-semibold">
+                      Choose orchard video
+                    </span>
+                    <input
+                        type="file"
+                        accept="video/*"
+                        className="mt-3 block w-full text-xs"
+                        onChange={(e) => handleVideoChange(e.target.files?.[0])}
+                      />
+                  </label>
+                  {videoPreview && (
+                    <div className="mt-4">
+                      <p className="mb-2 text-sm font-semibold text-stone-700">
+                        Video preview
+                      </p>
+                      <video
+                        src={videoPreview}
+                        controls
+                        className="w-full rounded-xl"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setVideoPreview(null)}
+                        className="mt-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                      >
+                        Remove video
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-2xl border border-stone-200 bg-white p-6">
+                  <div className="flex items-center gap-2">
+                    <ImagePlus className="text-amber-700" />
+                    <h2 className="font-bold">Mango photos</h2>
+                  </div>
+                  <p className="mt-2 text-sm text-stone-500">
+                    Select multiple photos of your mango harvest.
+                  </p>
+                  <label className="mt-5 block cursor-pointer rounded-xl border-2 border-dashed border-stone-300 p-8 text-center hover:bg-stone-50">
+                    <ImagePlus className="mx-auto text-stone-500" size={30} />
+                    <span className="mt-3 block text-sm font-semibold">
+                      Choose mango photos
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="mt-3 block w-full text-xs"
+                      onChange={(e) => handlePhotoChange(e.target.files)}
+                      />
+                      {photoPreviews.length > 0 && (
+                        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                          {photoPreviews.map((url, index) => (
+                            <div
+                              key={url}
+                              className="overflow-hidden rounded-xl border border-stone-200"
+                            >
+                              <img
+                                src={url}
+                                alt={`Orchard photo preview ${index + 1}`}
+                                className="h-36 w-full object-cover"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  URL.revokeObjectURL(url);
+                                  setPhotoPreviews((current) =>
+                                    current.filter((photo) => photo !== url)
+                                  );
+                                }}
+                                className="w-full border-t border-stone-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                  </label>
+                </div>
+              </div>
+
+              <div className="mt-6 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
+                Demo interface only: selected files are not uploaded or saved yet.
+                Storage and harvest-batch linking will be connected later.
+              </div>
+            </>}
+
             <footer className="mt-10 border-t border-stone-200 pt-5 text-xs text-stone-400">Orchiva · Mangoes straight from the orchard · Seller dashboard demo</footer>
           </div>
         </main>
