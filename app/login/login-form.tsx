@@ -52,7 +52,7 @@ export function LoginForm() {
         ? "/admin"
         : role === "SELLER"
           ? "/seller"
-          : "/";
+          : "/customer";
 
     // Respect an existing protected-page callback.
     const destination =
