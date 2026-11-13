@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ui } from "@/lib/ui";
 import { setUserRole } from "./actions";
+import { ResetLinkButton } from "./reset-link";
 
 const roleBadge: Record<Role, string> = {
   CUSTOMER: "bg-stone-100 text-stone-700",
@@ -53,6 +54,7 @@ async function UserList() {
           {u.id === admin.id ? (
             <p className="text-sm text-stone-500">This is you</p>
           ) : (
+            <div className="flex flex-wrap items-start gap-2 sm:justify-end">
             <form action={setUserRole} className="flex gap-2">
               <input type="hidden" name="userId" value={u.id} />
               <label className="sr-only" htmlFor={`role-${u.id}`}>
@@ -74,6 +76,8 @@ async function UserList() {
                 Save
               </button>
             </form>
+            <ResetLinkButton userId={u.id} userName={u.name} />
+            </div>
           )}
         </li>
       ))}

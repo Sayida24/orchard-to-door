@@ -106,12 +106,25 @@ export function LoginForm() {
         {pending ? "Logging in…" : "Log in"}
       </button>
 
-      <p className="text-center text-sm text-stone-600">
-        New here?{" "}
-        <Link href="/register" className={ui.link}>
-          Create an account
+      <div className="text-center">
+        <Link
+          href="/forgot-password"
+          className="inline-flex min-h-11 items-center px-2 text-sm font-medium text-stone-600 underline-offset-4 transition-colors hover:text-amber-700 hover:underline"
+        >
+          Forgot your password?
         </Link>
-      </p>
+      </div>
+
+      {/* Divider, then sign-up as a quieter secondary action */}
+      <div className="flex items-center gap-3 text-xs font-medium uppercase tracking-wider text-stone-400" aria-hidden="true">
+        <span className="h-px flex-1 bg-stone-200" />
+        New to Orchiva?
+        <span className="h-px flex-1 bg-stone-200" />
+      </div>
+
+      <Link href="/register" className={`${ui.buttonSecondary} w-full`}>
+        Create an account
+      </Link>
     </form>
   );
 }
