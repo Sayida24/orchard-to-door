@@ -17,7 +17,6 @@ export default function RegisterPage() {
 
           <div className="relative z-10">
             <div className="flex items-center gap-2">
-              <span className="text-3xl">🥭</span>
               <span className="text-2xl font-extrabold tracking-tight">
                 Orchiva
               </span>

@@ -1,977 +1,213 @@
-'use client';
+import type { Metadata } from "next";
+import Form from "next/form";
+import Link from "next/link";
+import { connection } from "next/server";
+import { Suspense } from "react";
+import { Photo } from "@/components/photo";
+import { getCurrentUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { dhakaDayStart, openBatchWhere, taka } from "@/lib/shop";
 
-import mangoBackground from "./mango-bg.jpeg";
-import React, { useState } from 'react';
-import {
-  ShoppingBag,
-  Sparkles,
-  ShieldCheck,
-  Truck,
-  Gift,
-  MapPin,
-  Calendar,
-  ChevronRight,
-  ChevronLeft,
-  X,
-  Search,
-  CheckCircle2,
-  AlertCircle,
-  QrCode,
-  Scale,
-  BookOpen,
-  ArrowRight,
-  Video,
-  Image as ImageIcon,
-  Trees,
-} from 'lucide-react';
+export const metadata: Metadata = { title: "Orchards · Orchiva" };
 
-// ==========================================
-// 1. DATA MODELS & INITIAL CATALOG DATA
-// ==========================================
+const FALLBACK_COVER = "/images/orchard.png";
 
-interface Batch {
-  id: string;
-  varietyName: string;
-  banglaName: string;
-  orchardName: string;
-  district: string;
-  harvestDate: string;
-  totalKg: number;
-  availableKg: number;
-  pricePerKg: number;
-  harvestVideoUrl: string;
-  photos: string[]; // batch photos shown in the order popup (first = card cover)
-  sweetnessBrix: string;
-  status: 'OPEN' | 'SOLD_OUT';
+// Customer home (FR-02, FR-03): every orchard, with today's harvest videos
+// and the mangoes it has on sale. Tap one to watch and order.
+export default function CustomerHome({ searchParams }: PageProps<"/customer">) {
+  return (
+    <main className="mx-auto w-full max-w-5xl px-4 py-6 sm:py-8">
+      <Suspense fallback={<OrchardsSkeleton />}>
+        <Orchards searchParams={searchParams} />
+      </Suspense>
+    </main>
+  );
 }
 
-interface Order {
-  id: string;
-  varietyName: string;
-  orchardName: string;
-  boxSizeKg: number;
-  isGiftBox: boolean;
-  totalPrice: number;
-  address: string;
-  city: string;
-  deliverySlot: string;
-  status: 'PLACED' | 'PACKED' | 'DISPATCHED' | 'DELIVERED';
-  createdAt: string;
-  boxQr: string;
-}
+async function Orchards({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const sp = await searchParams;
+  const variety = typeof sp.variety === "string" ? sp.variety : "";
+  const q = typeof sp.q === "string" ? sp.q.trim().slice(0, 60) : "";
+  await connection(); // "today" depends on the request time, so never prerender this part
+  const now = new Date();
+  const today = dhakaDayStart(now);
+  const like = { contains: q, mode: "insensitive" as const };
 
-const INITIAL_BATCHES: Batch[] = [
-  {
-    id: 'batch_har_01',
-    varietyName: 'Haribhanga',
-    banglaName: 'হাঁড়িভাঙ্গা',
-    orchardName: 'Padma Riverside Organic Orchards',
-    district: 'Rajshahi & Rangpur',
-    harvestDate: 'Today, 06:30 AM',
-    totalKg: 500,
-    availableKg: 380,
-    pricePerKg: 155,
-    harvestVideoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-wind-blowing-the-leaves-of-a-tall-tree-42523-large.mp4',
-    photos: [
-      '/images/mangoes.png',
-      'https://images.unsplash.com/photo-1591073113125-e46713c829ed?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1553279768-865429fa0078?auto=format&fit=crop&w=600&q=80',
-    ],
-    sweetnessBrix: '20° - 21° Brix',
-    status: 'OPEN',
-  },
-  {
-    id: 'batch_him_02',
-    varietyName: 'Himsagar',
-    banglaName: 'হিমসাগর',
-    orchardName: 'Kansat Royal Heritage Groves',
-    district: 'Chapainawabganj',
-    harvestDate: 'Yesterday, 07:15 AM',
-    totalKg: 800,
-    availableKg: 420,
-    pricePerKg: 140,
-    harvestVideoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-farmer-walking-through-a-sunny-field-42702-large.mp4',
-    photos: [
-      'https://images.unsplash.com/photo-1553279768-865429fa0078?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1591073113125-e46713c829ed?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1601493700631-2b16ec4b4716?auto=format&fit=crop&w=600&q=80',
-    ],
-    sweetnessBrix: '19° - 22° Brix',
-    status: 'OPEN',
-  },
-  {
-    id: 'batch_lan_03',
-    varietyName: 'Langra (Benarasi)',
-    banglaName: 'ল্যাংড়া',
-    orchardName: 'Padma Riverside Organic Orchards',
-    district: 'Rajshahi',
-    harvestDate: '2 Days ago',
-    totalKg: 650,
-    availableKg: 190,
-    pricePerKg: 160,
-    harvestVideoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-sun-beams-through-the-branches-of-a-tree-41315-large.mp4',
-    photos: [
-      'https://images.unsplash.com/photo-1591073113125-e46713c829ed?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1553279768-865429fa0078?auto=format&fit=crop&w=600&q=80',
-    ],
-    sweetnessBrix: '18° - 20° Brix',
-    status: 'OPEN',
-  },
-  {
-    id: 'batch_amr_04',
-    varietyName: 'Amrapali',
-    banglaName: 'আম্রপালি',
-    orchardName: 'Sundarban Coastal Breezes Farm',
-    district: 'Satkhira',
-    harvestDate: 'Today, 08:00 AM',
-    totalKg: 450,
-    availableKg: 450,
-    pricePerKg: 175,
-    harvestVideoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-wind-blowing-the-leaves-of-a-tall-tree-42523-large.mp4',
-    photos: [
-      'https://images.unsplash.com/photo-1601493700631-2b16ec4b4716?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1553279768-865429fa0078?auto=format&fit=crop&w=600&q=80',
-    ],
-    sweetnessBrix: '22° - 24° Brix',
-    status: 'OPEN',
-  },
-];
+  const [user, varieties, rows] = await Promise.all([
+    getCurrentUser(),
+    prisma.variety.findMany({
+      where: { batches: { some: openBatchWhere(now) } },
+      orderBy: { name: "asc" },
+      select: { name: true },
+    }),
+    prisma.orchard.findMany({
+      where: q
+        ? { OR: [{ name: like }, { location: like }, { batches: { some: { variety: { name: like } } } }] }
+        : undefined,
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        location: true,
+        photoUrls: true,
+        batches: { where: openBatchWhere(now), select: { pricePerKg: true, variety: { select: { name: true } } } },
+        _count: { select: { videos: { where: { recordedAt: { gte: today } } } } },
+      },
+    }),
+  ]);
 
-const INITIAL_ORDERS: Order[] = [
-  {
-    id: 'ORD-8941',
-    varietyName: 'Himsagar',
-    orchardName: 'Kansat Royal Heritage Groves',
-    boxSizeKg: 5,
-    isGiftBox: true,
-    totalPrice: 820,
-    address: 'House 42, Road 11, Block D, Banani',
-    city: 'Dhaka',
-    deliverySlot: 'Today Evening (6:00 PM - 9:00 PM)',
-    status: 'PACKED',
-    createdAt: '2026-11-06T07:45:00Z',
-    boxQr: 'X7K2P9',
-  },
-  {
-    id: 'ORD-8933',
-    varietyName: 'Langra (Benarasi)',
-    orchardName: 'Padma Riverside Organic Orchards',
-    boxSizeKg: 10,
-    isGiftBox: false,
-    totalPrice: 1660,
-    address: 'Apt 5B, Concord Tower, Gulshan-2',
-    city: 'Dhaka',
-    deliverySlot: 'Tomorrow Morning (8:00 AM - 11:00 AM)',
-    status: 'DISPATCHED',
-    createdAt: '2026-11-05T11:20:00Z',
-    boxQr: 'M4V9T2',
-  },
-];
+  const orchards = rows
+    .map((o) => ({
+      ...o,
+      varieties: [...new Set(o.batches.map((b) => b.variety.name))],
+      fromPrice: o.batches.length ? Math.min(...o.batches.map((b) => b.pricePerKg)) : null,
+      videosToday: o._count.videos,
+    }))
+    .filter((o) => !variety || o.varieties.includes(variety))
+    // Orchards with mangoes on sale first, then the ones with fresh videos.
+    .sort((a, b) => Number(b.fromPrice !== null) - Number(a.fromPrice !== null) || b.videosToday - a.videosToday);
 
-// ==========================================
-// 2. MAIN CUSTOMER FRONTEND COMPONENT
-// ==========================================
-
-export default function CustomerPage() {
-  const [activeTab, setActiveTab] = useState<'batches' | 'guide' | 'orchards' | 'orders'>('batches');
-  const [batches, setBatches] = useState<Batch[]>(INITIAL_BATCHES);
-  const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
-  const [filterVariety, setFilterVariety] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // Modals & Interactive Viewers
-  const [inspectBatch, setInspectBatch] = useState<Batch | null>(null);
-  const [inspectBoxQr, setInspectBoxQr] = useState<string | null>(null);
-  const [showProblemModal, setShowProblemModal] = useState<string | null>(null);
-  const [problemSuccess, setProblemSuccess] = useState(false);
-
-  // Ordering Form State
-  const [boxSizeKg, setBoxSizeKg] = useState<5 | 10>(5);
-  const [isGiftBox, setIsGiftBox] = useState(false);
-  const [giftNote, setGiftNote] = useState('');
-  const [customerName, setCustomerName] = useState('Tanvir Hossain');
-  const [customerPhone, setCustomerPhone] = useState('+880 1712-345678');
-  const [address, setAddress] = useState('House 24, Road 7, Sector 4, Uttara');
-  const [city, setCity] = useState('Dhaka');
-  const [deliverySlot, setDeliverySlot] = useState('Tomorrow Morning (8:00 AM - 11:00 AM)');
-  const [orderSuccessBanner, setOrderSuccessBanner] = useState(false);
-
-  // Handle Order Placement (FR-09 to FR-11)
-  const handlePlaceOrder = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inspectBatch) return;
-
-    const fruitPrice = boxSizeKg * inspectBatch.pricePerKg;
-    const giftFee = isGiftBox ? 120 : 0;
-    const deliveryFee = 60;
-    const grandTotal = fruitPrice + giftFee + deliveryFee;
-
-    const newOrderId = `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
-    const randomQr = 'X7K' + Math.floor(100 + Math.random() * 900);
-
-    const newOrder: Order = {
-      id: newOrderId,
-      varietyName: inspectBatch.varietyName,
-      orchardName: inspectBatch.orchardName,
-      boxSizeKg,
-      isGiftBox,
-      totalPrice: grandTotal,
-      address,
-      city,
-      deliverySlot,
-      status: 'PLACED',
-      createdAt: new Date().toISOString(),
-      boxQr: randomQr,
-    };
-
-    // Decrement stock (FR-08)
-    setBatches((prev) =>
-      prev.map((b) =>
-        b.id === inspectBatch.id ? { ...b, availableKg: Math.max(0, b.availableKg - boxSizeKg) } : b
-      )
-    );
-
-    setOrders((prev) => [newOrder, ...prev]);
-    setInspectBatch(null);
-    setOrderSuccessBanner(true);
-    setActiveTab('orders');
-    setTimeout(() => setOrderSuccessBanner(false), 5000);
+  const chipHref = (v: string) => {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (v) params.set("variety", v);
+    const s = params.toString();
+    return s ? `/customer?${s}` : "/customer";
   };
 
-  const filteredBatches = batches.filter((b) => {
-    if (filterVariety !== 'all' && b.varietyName.toLowerCase() !== filterVariety.toLowerCase()) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      return b.varietyName.toLowerCase().includes(q) || b.orchardName.toLowerCase().includes(q);
-    }
-    return true;
-  });
-
   return (
-    <div className="min-h-screen bg-[#fafaf9] text-stone-900 font-sans selection:bg-amber-500 selection:text-white">
-      {/* Top Announcement Bar */}
-      <div className="bg-stone-900 text-stone-300 text-xs py-2 px-4 border-b border-stone-800">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Today's harvest picked from Chapainawabganj & Rajshahi orchards</span>
-          </div>
-          <span className="font-mono text-amber-400 font-bold hidden sm:inline">100% Carbide-Free · YOLOv8 AI Inspected</span>
-        </div>
+    <div className="space-y-5">
+      <div className="space-y-1">
+        {user && <p className="text-stone-600">Hello, {user.name.split(" ")[0]}</p>}
+        <h1 className="text-2xl font-extrabold tracking-tight text-stone-900 sm:text-3xl">
+          Pick an orchard, watch today&apos;s harvest, then order.
+        </h1>
       </div>
 
-      {/* Main Navigation Bar */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-stone-200">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-6">
-          {/* Brand */}
-          <button
-            onClick={() => setActiveTab('batches')}
-            className="flex items-center gap-2.5 text-xl font-bold tracking-tight text-stone-950"
-          >
-            <span className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center font-black text-base shadow-sm">
-              🥭
-            </span>
-            <span>Orchard to Door</span>
-          </button>
+      <Form action="/customer" className="relative" role="search">
+        <label htmlFor="q" className="sr-only">
+          Search orchards or varieties
+        </label>
+        <svg aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-stone-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="11" cy="11" r="8" />
+          <path d="m21 21-4.3-4.3" />
+        </svg>
+        <input
+          id="q"
+          name="q"
+          type="search"
+          defaultValue={q}
+          placeholder="Search orchards or varieties"
+          className="h-12 w-full rounded-2xl border border-stone-300 bg-white pl-11 pr-4 text-base text-stone-900 placeholder:text-stone-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200"
+        />
+        {variety && <input type="hidden" name="variety" value={variety} />}
+      </Form>
 
-          {/* Navigation Links */}
-          <nav className="flex items-center gap-1 sm:gap-2">
-            <button
-              onClick={() => setActiveTab('batches')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${
-                activeTab === 'batches' ? 'bg-amber-500 text-white shadow-xs' : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
-              }`}
-            >
-              Fresh Batches
-            </button>
-            <button
-              onClick={() => setActiveTab('guide')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${
-                activeTab === 'guide' ? 'bg-amber-500 text-white shadow-xs' : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
-              }`}
-            >
-              Mango Guide
-            </button>
-            <button
-              onClick={() => setActiveTab('orchards')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${
-                activeTab === 'orchards' ? 'bg-amber-500 text-white shadow-xs' : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
-              }`}
-            >
-              Orchards
-            </button>
-            <button
-              onClick={() => setActiveTab('orders')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 ${
-                activeTab === 'orders' ? 'bg-stone-900 text-white shadow-xs' : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
-              }`}
-            >
-              <ShoppingBag className="w-3.5 h-3.5" />
-              My Orders ({orders.length})
-            </button>
-          </nav>
-        </div>
-      </header>
-
-      {/* Success Banner */}
-      {orderSuccessBanner && (
-        <div className="bg-emerald-600 text-white px-4 py-3 text-center text-xs font-bold shadow-md flex items-center justify-center gap-2">
-          <CheckCircle2 className="w-4 h-4" />
-          <span>Order placed successfully! The orchard is now packing your box and preparing the YOLO AI scan.</span>
-        </div>
-      )}
-
-      {/* MAIN CONTENT AREA */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-10">
-
-        {/* ========================================== */}
-        {/* VIEW 1: BROWSE FRESH BATCHES (Storefront) */}
-        {/* ========================================== */}
-        {activeTab === 'batches' && (
-          <div className="space-y-10">
-            {/* Fancy Hero Banner */}
-            <div
-              className="relative overflow-hidden rounded-3xl bg-cover bg-center text-white p-8 sm:p-12 border border-amber-900/40 shadow-xl"
-              style={{
-                backgroundImage: `linear-gradient(rgba(20, 15, 5, 0.58), rgba(20, 15, 5, 0.58)), url(${mangoBackground.src})`,
-              }}
-            >
-              <div className="relative z-10 max-w-2xl space-y-4">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-mono font-semibold border border-amber-500/30">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Direct-to-Customer Heritage Mangoes
-                </div>
-                <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-tight">
-                  See your mangoes before you buy, and your own box before it ships.
-                </h1>
-                <p className="text-sm text-stone-300 leading-relaxed">
-                  Browse fresh harvest batches straight from the orchard, then see your own packed box, checked by YOLOv8 AI for common visible diseases.
-                </p>
-                <div className="pt-2 flex flex-wrap gap-3">
-                  <button
-                    onClick={() => {
-                      document.getElementById('catalog')?.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                    className="px-5 py-3 bg-amber-500 hover:bg-amber-600 text-stone-950 font-bold rounded-xl text-xs flex items-center gap-2 transition-all shadow-md"
-                  >
-                    Browse Today's Batches <ArrowRight className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setInspectBoxQr('X7K2P9')}
-                    className="px-5 py-3 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl text-xs flex items-center gap-2 border border-white/20 transition-all"
-                  >
-                    <QrCode className="w-4 h-4 text-amber-400" />
-                    Inspect Box #X7K2P9 (3D & AI)
-                  </button>
-                </div>
-              </div>
-
-              {/* 3 Trust Markers */}
-              <div className="mt-8 pt-6 border-t border-white/15 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs text-stone-300">
-                <div className="flex items-center gap-2">
-                  <ImageIcon className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span>Real batch photos before ordering</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>YOLOv8 AI checks every mango</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Truck className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span>Doorstep delivery across Dhaka</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Filter and Search Bar */}
-            <div id="catalog" className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <div className="text-xs font-mono uppercase tracking-wider text-amber-600 font-bold">In Season Now</div>
-                  <h2 className="text-2xl font-bold text-stone-900">Fresh Harvest Batches</h2>
-                </div>
-
-                {/* Search */}
-                <div className="relative w-full sm:w-64">
-                  <Search className="w-4 h-4 text-stone-400 absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search variety, orchard..."
-                    className="w-full pl-9 pr-3 py-2 text-xs border border-stone-200 rounded-xl bg-white focus:outline-hidden focus:ring-2 focus:ring-amber-500"
-                  />
-                </div>
-              </div>
-
-              {/* Quick Filter Buttons */}
-              <div className="flex flex-wrap items-center gap-2">
-                {[
-                  { label: 'All Varieties', value: 'all' },
-                  { label: 'Haribhanga (হাঁড়িভাঙ্গা)', value: 'Haribhanga' },
-                  { label: 'Himsagar (হিমসাগর)', value: 'Himsagar' },
-                  { label: 'Langra (ল্যাংড়া)', value: 'Langra (Benarasi)' },
-                  { label: 'Amrapali (আম্রপালি)', value: 'Amrapali' },
-                ].map((item) => (
-                  <button
-                    key={item.value}
-                    onClick={() => setFilterVariety(item.value)}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${
-                      filterVariety === item.value
-                        ? 'bg-amber-500 text-white shadow-xs'
-                        : 'bg-stone-200/60 text-stone-700 hover:bg-stone-200'
+      {varieties.length > 0 && (
+        <nav aria-label="Filter by variety" className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <ul className="flex gap-2">
+            {[{ name: "" }, ...varieties].map((v) => {
+              const active = v.name === variety;
+              return (
+                <li key={v.name || "all"}>
+                  <Link
+                    href={chipHref(v.name)}
+                    aria-current={active ? "page" : undefined}
+                    className={`inline-flex h-11 items-center whitespace-nowrap rounded-full border px-4 text-sm font-semibold ${
+                      active ? "border-stone-900 bg-stone-900 text-white" : "border-stone-300 bg-white text-stone-800 hover:bg-stone-100"
                     }`}
                   >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Batch Cards Grid */}
-            <div className="grid grid-cols-1 gap-6">
-              {filteredBatches.map((batch) => (
-                <div
-                  key={batch.id}
-                  className="bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col group"
-                >
-                  {/* Photo with Media Badges */}
-                  <div
-                    onClick={() => setInspectBatch(batch)}
-                    className="relative aspect-4/3 bg-stone-100 overflow-hidden cursor-pointer"
-                  >
-                    <img
-                      src={batch.photos[0]}
-                      alt={batch.varietyName}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20" />
-
-                    <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-amber-400 text-[11px] px-2.5 py-1 rounded-md font-mono flex items-center gap-1">
-                      <ImageIcon className="w-3 h-3" /> {batch.photos.length} photos
-                    </div>
-
-                    <div className="absolute bottom-3 left-3 right-3 text-white flex justify-between items-center text-xs">
-                      <span className="font-semibold flex items-center gap-1">
-                        <MapPin className="w-3.5 h-3.5 text-amber-400" /> {batch.district}
-                      </span>
-                      <span className="bg-amber-500 text-stone-950 font-bold px-2 py-0.5 rounded text-[11px]">
-                        {batch.sweetnessBrix}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Details */}
-                  <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
-                    <div>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="text-lg font-bold text-stone-900 group-hover:text-amber-600 transition-colors">
-                            {batch.varietyName}
-                          </h3>
-                          <p className="text-xs text-stone-500">{batch.orchardName}</p>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-lg font-extrabold font-mono text-stone-900">৳{batch.pricePerKg}</span>
-                          <span className="text-xs text-stone-500"> / kg</span>
-                        </div>
-                      </div>
-
-                      {/* Stock Progress */}
-                      <div className="mt-3 space-y-1">
-                        <div className="flex justify-between text-[11px] text-stone-500">
-                          <span>Harvested {batch.harvestDate}</span>
-                          <span className="font-bold text-stone-700">{batch.availableKg} kg left</span>
-                        </div>
-                        <div className="w-full bg-stone-100 rounded-full h-1.5 overflow-hidden">
-                          <div
-                            className="bg-amber-500 h-1.5 rounded-full"
-                            style={{ width: `${(batch.availableKg / batch.totalKg) * 100}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Order Button */}
-                    <button
-                      onClick={() => setInspectBatch(batch)}
-                      className="w-full py-2.5 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors shadow-xs"
-                    >
-                      View Batch & Order <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ========================================== */}
-        {/* VIEW 2: MANGO GUIDE & RIPENING (FR-04)    */}
-        {/* ========================================== */}
-        {activeTab === 'guide' && (
-          <div className="space-y-6">
-            <div>
-              <div className="text-xs font-mono uppercase tracking-wider text-amber-600 font-bold">Almanac & Profiles</div>
-              <h2 className="text-2xl font-bold text-stone-900">The Bengal Mango Calendar</h2>
-              <p className="text-xs text-stone-600 mt-1">Discover harvest windows, sugar Brix levels, and ideal pairings for authentic heritage varieties.</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[
-                {
-                  name: 'Haribhanga (হাঁড়িভাঙ্গা)',
-                  months: 'June – July',
-                  brix: '20° – 21° Brix',
-                  taste: 'Virtually stringless silky pulp with tiny flat stone. Savor fresh.',
-                  origin: 'Rangpur & Rajshahi',
-                  img: '/images/harivanga2.jpeg',
-                },
-                {
-                  name: 'Himsagar (হিমসাগর)',
-                  months: 'May – June',
-                  brix: '19° – 22° Brix',
-                  taste: 'The King of early summer. Buttery, fiberless, sweet honeysuckle aroma.',
-                  origin: 'Chapainawabganj',
-                  img: '/images/himsagar.jpeg',
-                },
-                {
-                  name: 'Langra (ল্যাংড়া)',
-                  months: 'June – July',
-                  brix: '18° – 20° Brix',
-                  taste: 'Bold sweet-tangy punch, stays light greenish even at full ripeness.',
-                  origin: 'Padma Riverside, Rajshahi',
-                  img: '/images/langra.jpeg',
-                },
-                {
-                  name: 'Amrapali (আম্রপালি)',
-                  months: 'June – July',
-                  brix: '22° – 24° Brix',
-                  taste: 'Highest natural sugar concentration, deep saffron-red velvety flesh.',
-                  origin: 'Satkhira & Chapai',
-                  img: '/images/amrapali.jpeg',
-                },
-              ].map((item, idx) => (
-                <div key={idx} className="p-4 bg-white rounded-2xl border border-stone-200 shadow-xs flex gap-4 items-center">
-                  <img src={item.img} alt={item.name} className="w-24 h-24 rounded-xl object-cover border border-stone-200 shrink-0" />
-                  <div className="space-y-1 text-xs">
-                    <div className="font-bold text-stone-900 text-sm">{item.name}</div>
-                    <div className="text-amber-700 font-semibold font-mono">{item.months} · {item.brix}</div>
-                    <p className="text-stone-600 leading-snug">{item.taste}</p>
-                    <div className="text-[11px] text-stone-400">Origin: {item.origin}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ========================================== */}
-        {/* VIEW 3: ORCHARDS EXPLORER (FR-03)         */}
-        {/* ========================================== */}
-        {activeTab === 'orchards' && (
-          <div className="space-y-6">
-            <div>
-              <div className="text-xs font-mono uppercase tracking-wider text-amber-600 font-bold">Partner Groves</div>
-              <h2 className="text-2xl font-bold text-stone-900">Our Heritage Orchards</h2>
-              <p className="text-xs text-stone-600 mt-1">Direct from 40-year-old heritage trees nurtured along the Padma and Pagla rivers.</p>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-xs">
-              <div className="relative aspect-video sm:aspect-21/9 bg-stone-900 flex items-center justify-center">
-                <video
-                  src="/videos/orchard.mp4"
-                  controls
-              
-                  muted
-                  
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-white text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5">
-                  <Video className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Kansat Royal Heritage Groves · Chapainawabganj</span>
-                </div>
-              </div>
-
-              <div className="p-6 space-y-3">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-xl font-bold text-stone-900">Kansat Heritage Preserve (65 Acres)</h3>
-                  <span className="text-xs bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded-full">
-                    Chemical Ripener Free
-                  </span>
-                </div>
-                <p className="text-xs text-stone-600 leading-relaxed">
-                  Situated along the Pagla River basin, featuring over 1,450 heritage mango trees. Every single crate shipped to your door is picked tree-ripe and packed with organic paddy straw.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ========================================== */}
-        {/* VIEW 4: MY ORDERS & TIMELINE (FR-19, 20)  */}
-        {/* ========================================== */}
-        {activeTab === 'orders' && (
-          <div className="space-y-6">
-            <div>
-              <div className="text-xs font-mono uppercase tracking-wider text-amber-600 font-bold">Trace & Verification</div>
-              <h2 className="text-2xl font-bold text-stone-900">Your Mango Orders</h2>
-              <p className="text-xs text-stone-600 mt-1">Track packing progress, inspect 3D crates, and view YOLO AI quality scan results.</p>
-            </div>
-
-            <div className="space-y-4">
-              {orders.map((order) => {
-                const stepNum = order.status === 'PLACED' ? 1 : order.status === 'PACKED' ? 2 : order.status === 'DISPATCHED' ? 3 : 4;
-                return (
-                  <div key={order.id} className="bg-white rounded-2xl border border-stone-200 shadow-xs overflow-hidden">
-                    <div className="p-4 sm:p-5 bg-stone-50 border-b border-stone-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div>
-                        <div className="flex items-center gap-2 text-xs">
-                          <span className="font-mono font-bold text-stone-900">#{order.id}</span>
-                          <span>·</span>
-                          <span className="text-stone-500">{order.varietyName} ({order.boxSizeKg} kg crate)</span>
-                        </div>
-                        <div className="text-sm font-bold text-stone-900 mt-0.5">{order.orchardName}</div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setInspectBoxQr(order.boxQr)}
-                          className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors"
-                        >
-                          <QrCode className="w-3.5 h-3.5" />
-                          View Box Provenance & 3D
-                        </button>
-                        <button
-                          onClick={() => setShowProblemModal(order.id)}
-                          className="px-3 py-1.5 border border-stone-300 hover:bg-stone-100 text-stone-700 rounded-lg text-xs font-semibold transition-colors"
-                        >
-                          Report Issue (FR-21)
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* 4-Step Progress Indicator (FR-19) */}
-                    <div className="p-5">
-                      <div className="grid grid-cols-4 gap-2 text-center text-xs">
-                        <div className={stepNum >= 1 ? 'text-amber-600 font-bold' : 'text-stone-400'}>
-                          <div className={`w-7 h-7 mx-auto rounded-full flex items-center justify-center mb-1 text-xs ${stepNum >= 1 ? 'bg-amber-500 text-white' : 'bg-stone-200 text-stone-500'}`}>1</div>
-                          <div>Placed</div>
-                        </div>
-                        <div className={stepNum >= 2 ? 'text-amber-600 font-bold' : 'text-stone-400'}>
-                          <div className={`w-7 h-7 mx-auto rounded-full flex items-center justify-center mb-1 text-xs ${stepNum >= 2 ? 'bg-amber-500 text-white' : 'bg-stone-200 text-stone-500'}`}>2</div>
-                          <div>Packed & AI Checked</div>
-                        </div>
-                        <div className={stepNum >= 3 ? 'text-amber-600 font-bold' : 'text-stone-400'}>
-                          <div className={`w-7 h-7 mx-auto rounded-full flex items-center justify-center mb-1 text-xs ${stepNum >= 3 ? 'bg-amber-500 text-white' : 'bg-stone-200 text-stone-500'}`}>3</div>
-                          <div>Dispatched</div>
-                        </div>
-                        <div className={stepNum >= 4 ? 'text-emerald-600 font-bold' : 'text-stone-400'}>
-                          <div className={`w-7 h-7 mx-auto rounded-full flex items-center justify-center mb-1 text-xs ${stepNum >= 4 ? 'bg-emerald-600 text-white' : 'bg-stone-200 text-stone-500'}`}>4</div>
-                          <div>Delivered</div>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 pt-3 border-t border-stone-100 text-[11px] text-stone-500 flex justify-between">
-                        <span>Delivery: {order.address}, {order.city}</span>
-                        <span className="font-bold text-stone-900">৳{order.totalPrice} (Cash on Delivery)</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </main>
-
-      {/* ======================================================== */}
-      {/* MODAL 1: BATCH PHOTOS & ORDER CONFIGURATOR (FR-09 to FR-11) */}
-      {/* ======================================================== */}
-      {inspectBatch && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-stone-200">
-            {/* Modal Header */}
-            <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-md p-4 sm:p-5 border-b flex justify-between items-center">
-              <div>
-                <span className="text-xs font-mono text-amber-600 uppercase font-bold">Direct Harvest Batch</span>
-                <h2 className="text-xl font-bold text-stone-900">{inspectBatch.varietyName} ({inspectBatch.banglaName})</h2>
-              </div>
-              <button onClick={() => setInspectBatch(null)} className="p-1.5 text-stone-400 hover:text-stone-700">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 p-6">
-              {/* Left Column: Batch Photos */}
-              <div className="lg:col-span-7">
-                <BatchPhotos key={inspectBatch.id} photos={inspectBatch.photos} name={inspectBatch.varietyName} />
-              </div>
-
-              {/* Right Column: Order Form (FR-09, FR-10) */}
-              <div className="lg:col-span-5">
-                <form onSubmit={handlePlaceOrder} className="space-y-4 text-xs">
-                  {/* Crate Size */}
-                  <div>
-                    <label className="block font-bold text-stone-700 uppercase mb-1.5">1. Select Crate Size</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setBoxSizeKg(5)}
-                        className={`p-3 rounded-xl border text-left ${boxSizeKg === 5 ? 'border-amber-500 bg-amber-50/50 ring-1 ring-amber-500' : 'border-stone-200'}`}
-                      >
-                        <div className="font-bold text-sm text-stone-900">5 kg Crate</div>
-                        <div className="text-stone-500">~10-12 mangoes</div>
-                        <div className="text-amber-700 font-bold mt-1">৳{5 * inspectBatch.pricePerKg}</div>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setBoxSizeKg(10)}
-                        className={`p-3 rounded-xl border text-left ${boxSizeKg === 10 ? 'border-amber-500 bg-amber-50/50 ring-1 ring-amber-500' : 'border-stone-200'}`}
-                      >
-                        <div className="font-bold text-sm text-stone-900">10 kg Crate</div>
-                        <div className="text-stone-500">~20-24 mangoes</div>
-                        <div className="text-amber-700 font-bold mt-1">৳{10 * inspectBatch.pricePerKg}</div>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Gift Box Option */}
-                  <div className="p-3 bg-stone-50 rounded-xl border space-y-2">
-                    <label className="flex items-center justify-between cursor-pointer">
-                      <span className="font-semibold flex items-center gap-1.5">
-                        <Gift className="w-3.5 h-3.5 text-amber-600" /> Premium Festive Gift Wrap (+৳120)
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={isGiftBox}
-                        onChange={(e) => setIsGiftBox(e.target.checked)}
-                        className="w-4 h-4 accent-amber-500"
-                      />
-                    </label>
-                    {isGiftBox && (
-                      <input
-                        type="text"
-                        value={giftNote}
-                        onChange={(e) => setGiftNote(e.target.value)}
-                        placeholder="Greeting message on crate card..."
-                        className="w-full p-2 bg-white border rounded-lg text-xs"
-                      />
-                    )}
-                  </div>
-
-                  {/* Address & Slot */}
-                  <div className="space-y-2">
-                    <label className="block font-bold text-stone-700 uppercase">2. Delivery Address</label>
-                    <input
-                      type="text"
-                      value={address}
-                      onChange={(e) => setAddress(e.target.value)}
-                      placeholder="Street address, sector"
-                      required
-                      className="w-full p-2 border rounded-lg bg-white"
-                    />
-                    <select
-                      value={deliverySlot}
-                      onChange={(e) => setDeliverySlot(e.target.value)}
-                      className="w-full p-2 border rounded-lg bg-white"
-                    >
-                      <option>Tomorrow Morning (8:00 AM - 11:00 AM)</option>
-                      <option>Tomorrow Afternoon (2:00 PM - 5:00 PM)</option>
-                      <option>Tomorrow Evening (6:00 PM - 9:00 PM)</option>
-                    </select>
-                  </div>
-
-                  {/* Price Summary */}
-                  <div className="p-3 bg-stone-50 rounded-xl border space-y-1">
-                    <div className="flex justify-between text-stone-500">
-                      <span>{boxSizeKg} kg Mangoes:</span>
-                      <span>৳{boxSizeKg * inspectBatch.pricePerKg}</span>
-                    </div>
-                    {isGiftBox && (
-                      <div className="flex justify-between text-stone-500">
-                        <span>Gift Packaging:</span>
-                        <span>+৳120</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between text-stone-500">
-                      <span>Express Delivery ({city}):</span>
-                      <span>+৳60</span>
-                    </div>
-                    <div className="border-t pt-1.5 flex justify-between font-bold text-stone-900 text-sm">
-                      <span>Total (Cash on Delivery):</span>
-                      <span className="text-amber-700 font-mono">
-                        ৳{boxSizeKg * inspectBatch.pricePerKg + (isGiftBox ? 120 : 0) + 60}
-                      </span>
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-sm shadow-md transition-colors"
-                  >
-                    Confirm Order (Cash on Delivery)
-                  </button>
-                </form>
-              </div>
-            </div>
-          </div>
-        </div>
+                    {v.name || "All"}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
       )}
 
-      {/* ======================================================== */}
-      {/* MODAL 2: 3D CRATE & YOLO AI PROVENANCE DOSSIER (FR-20)   */}
-      {/* ======================================================== */}
-      {inspectBoxQr && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border space-y-5 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b pb-3">
-              <div className="flex items-center gap-2">
-                <QrCode className="w-5 h-5 text-amber-500" />
-                <div>
-                  <h3 className="font-bold text-stone-900 text-base">Box Provenance #{inspectBoxQr}</h3>
-                  <p className="text-xs text-stone-500">YOLOv8 AI Checked · Direct from Orchard</p>
-                </div>
-              </div>
-              <button onClick={() => setInspectBoxQr(null)} className="p-1 text-stone-400 hover:text-stone-700">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-lg font-bold text-stone-900">Orchards</h2>
+        <span className="text-sm text-stone-600">
+          {orchards.length} {orchards.length === 1 ? "orchard" : "orchards"}
+        </span>
+      </div>
 
-            {/* Simulated 3D Crate Visual */}
-            <div className="p-6 bg-stone-900 rounded-2xl text-white text-center space-y-3 relative overflow-hidden">
-              <div className="text-6xl animate-bounce">📦🥭</div>
-              <div className="font-bold text-base text-amber-400">Ventilated Pine Wood Crate (5.2 kg Net)</div>
-              <p className="text-xs text-stone-300 max-w-sm mx-auto">
-                Packed in organic paddy straw. Photographed from 4 angles and verified 100% defect-free before sealing.
-              </p>
-            </div>
-
-            {/* YOLO AI Inspection Summary */}
-            <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-2xl space-y-2 text-xs">
-              <div className="font-bold text-emerald-800 flex items-center gap-1.5 text-sm">
-                <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                YOLOv8 AI Scan: Verified Clean (12/12 Fruits Healthy)
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-emerald-900 pt-1">
-                <div className="p-2 bg-white rounded-lg border border-emerald-200">
-                  <span className="text-stone-500">Healthy Mangoes:</span> <strong className="font-mono text-emerald-700">12 (100%)</strong>
-                </div>
-                <div className="p-2 bg-white rounded-lg border border-emerald-200">
-                  <span className="text-stone-500">Anthracnose / Scab:</span> <strong className="font-mono text-emerald-700">0 Detected</strong>
-                </div>
-              </div>
-            </div>
-
-            {/* Ripening Guide */}
-            <div className="p-4 bg-stone-50 rounded-2xl border text-xs space-y-1.5">
-              <div className="font-bold text-stone-900">Farmer Ripening Instructions:</div>
-              <p className="text-stone-600 leading-relaxed">
-                Allow 2-3 days at ambient room temperature (24°C–28°C) in the open crate. When the stem exudes sweet mango perfume and the shoulder yields gently to soft touch, immerse in cold water for 25 minutes before slicing.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* MODAL 3: REPORT A PROBLEM (FR-21)                       */}
-      {/* ======================================================== */}
-      {showProblemModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="font-bold text-base text-stone-900 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-amber-500" />
-                Report a Problem (#{showProblemModal})
-              </h3>
-              <button onClick={() => setShowProblemModal(null)} className="p-1 text-stone-400 hover:text-stone-700">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {problemSuccess ? (
-              <div className="p-4 bg-emerald-50 text-emerald-800 text-xs font-bold rounded-xl text-center">
-                Problem report submitted! Our admin will review and issue your refund or replacement crate within 24 hours.
-              </div>
-            ) : (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  setProblemSuccess(true);
-                  setTimeout(() => {
-                    setProblemSuccess(false);
-                    setShowProblemModal(null);
-                  }, 2000);
-                }}
-                className="space-y-3 text-xs"
+      {orchards.length === 0 ? (
+        <p className="rounded-2xl border border-dashed border-stone-300 p-6 text-center text-stone-600">
+          {variety ? `No orchard has ${variety} on sale right now.` : "No orchards match your search."}{" "}
+          <Link href="/customer" className="font-semibold text-amber-700 hover:underline">
+            Show all orchards
+          </Link>
+        </p>
+      ) : (
+        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {orchards.map((o) => (
+            <li key={o.id}>
+              <Link
+                href={`/customer/orchards/${o.id}`}
+                className="block h-full overflow-hidden rounded-3xl border border-stone-200 bg-white transition hover:border-amber-400 hover:shadow-md"
               >
-                <p className="text-stone-600">
-                  Our promise is 100% undamaged tree-ripened fruit. Describe the issue and upload a picture for an instant refund or replacement review.
-                </p>
-                <textarea
-                  rows={3}
-                  placeholder="e.g. One mango arrived with transit pressure bruise..."
-                  required
-                  className="w-full p-2.5 border rounded-xl"
-                />
-                <button
-                  type="submit"
-                  className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold"
-                >
-                  Submit Photo Report
-                </button>
-              </form>
-            )}
-          </div>
-        </div>
+                <div className="relative h-44 bg-stone-200">
+                  <Photo src={o.photoUrls[0] ?? FALLBACK_COVER} alt="" className="h-full w-full object-cover" />
+                  {o.videosToday > 0 ? (
+                    <span className="absolute left-3 top-3 inline-flex items-center gap-2 rounded-full bg-green-900 px-3 py-1.5 text-xs font-bold text-white">
+                      <span aria-hidden="true" className="h-2 w-2 rounded-full bg-green-300" />
+                      {o.videosToday} {o.videosToday === 1 ? "video" : "videos"} today
+                    </span>
+                  ) : (
+                    <span className="absolute left-3 top-3 rounded-full bg-stone-800 px-3 py-1.5 text-xs font-semibold text-white">
+                      No video today
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-2 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <h3 className="text-lg font-bold leading-snug text-stone-900">{o.name}</h3>
+                    {o.fromPrice !== null ? (
+                      <span className="shrink-0 text-sm text-stone-600">
+                        from <strong className="text-base text-stone-900">{taka(o.fromPrice)}</strong>/kg
+                      </span>
+                    ) : (
+                      <span className="shrink-0 text-sm font-semibold text-stone-600">Sold out for now</span>
+                    )}
+                  </div>
+                  <p className="flex items-center gap-1.5 text-sm text-stone-600">
+                    <svg aria-hidden="true" className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
+                      <circle cx="12" cy="10" r="3" />
+                    </svg>
+                    {o.location}
+                  </p>
+                  {o.varieties.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {o.varieties.map((v) => (
+                        <span key={v} className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900">
+                          {v}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </Link>
+            </li>
+          ))}
+        </ul>
       )}
-
-      {/* Footer */}
-      <footer className="mt-16 border-t border-stone-200 bg-white py-8 text-stone-500 text-xs text-center">
-        <div className="max-w-6xl mx-auto space-y-1">
-          <p className="font-bold text-stone-900">Orchard to Door — Direct Bengal Mango Marketplace</p>
-          <p>“See your mangoes before you buy, and your own box before it ships.”</p>
-          <p className="text-stone-400 pt-2">Chapainawabganj · Rajshahi · Satkhira · Rangpur</p>
-        </div>
-      </footer>
     </div>
   );
 }
 
-// Simple batch photo gallery: one large photo, tap a thumbnail to switch.
-function BatchPhotos({ photos, name }: { photos: string[]; name: string }) {
-  const [index, setIndex] = useState(0);
-  if (photos.length === 0) {
-    return (
-      <div className="rounded-2xl aspect-4/3 bg-stone-100 flex items-center justify-center text-sm text-stone-500">
-        No photos yet
-      </div>
-    );
-  }
+function OrchardsSkeleton() {
   return (
-    <div className="space-y-3">
-      <div className="rounded-2xl overflow-hidden aspect-4/3 bg-stone-100 border border-stone-200">
-        <img src={photos[index]} alt={`${name} batch, photo ${index + 1} of ${photos.length}`} className="w-full h-full object-cover" />
+    <div className="space-y-5" aria-busy="true" aria-label="Loading orchards">
+      <div className="h-16 max-w-xl animate-pulse rounded-xl bg-stone-200" />
+      <div className="h-12 animate-pulse rounded-2xl bg-stone-200" />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="h-72 animate-pulse rounded-3xl bg-stone-200" />
+        ))}
       </div>
-      {photos.length > 1 && (
-        <div className="flex gap-2">
-          {photos.map((src, i) => (
-            <button
-              key={src + i}
-              type="button"
-              onClick={() => setIndex(i)}
-              aria-label={`Show photo ${i + 1}`}
-              aria-current={i === index}
-              className={`h-16 w-20 shrink-0 overflow-hidden rounded-xl border-2 transition-colors ${
-                i === index ? 'border-amber-500' : 'border-transparent opacity-70 hover:opacity-100'
-              }`}
-            >
-              <img src={src} alt="" className="h-full w-full object-cover" />
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

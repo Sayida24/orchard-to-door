@@ -10,7 +10,7 @@ export function SiteHeader() {
     <header className="relative z-10 w-full border-b border-stone-200 bg-white">
       <div className="mx-auto flex h-16 w-full max-w-5xl items-center justify-between gap-3 px-4">
         <Link href="/" className="text-xl font-extrabold tracking-tight text-stone-900">
-          🥭 Orchiva
+          Orchiva
         </Link>
         <nav className="flex items-center gap-2">
           <Suspense fallback={<div className="h-11 w-24" />}>
@@ -51,9 +51,15 @@ async function UserMenu() {
         </Link>
       )}
       {user.role === "CUSTOMER" && (
-        <Link href="/customer" className={ui.buttonSecondary}>
-          My dashboard
-        </Link>
+        <>
+          {/* On phones the logo already leads customers to the orchards */}
+          <Link href="/customer" className={`${ui.buttonSecondary} hidden sm:inline-flex`}>
+            Orchards
+          </Link>
+          <Link href="/customer/orders" className={ui.buttonSecondary}>
+            My orders
+          </Link>
+        </>
       )}
       <span className="hidden text-sm text-stone-600 sm:inline">Hi, {user.name.split(" ")[0]}</span>
       <SignOutButton />

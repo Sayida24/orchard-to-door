@@ -1,4 +1,5 @@
 
+import Image from "next/image";
 import Link from "next/link";
 import { ui } from "@/lib/ui";
 
@@ -6,19 +7,19 @@ const varieties = [
   {
     name: "Himsagar",
     description: "Known for its sweet flavour and smooth texture.",
-    emoji: "🥭",
+    image: "/images/himsagar.jpeg",
     season: "Popular variety",
   },
   {
     name: "Langra",
     description: "A much-loved mango with a distinctive taste.",
-    emoji: "🥭",
+    image: "/images/langra.jpeg",
     season: "Traditional favourite",
   },
   {
-    name: "Fazli",
-    description: "A large mango enjoyed during the summer season.",
-    emoji: "🥭",
+    name: "Amrapali",
+    description: "Very sweet, with deep orange flesh.",
+    image: "/images/amrapali.jpeg",
     season: "Summer favourite",
   },
 ];
@@ -54,7 +55,7 @@ export default function Home() {
       <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-14 sm:px-6 sm:py-20 md:grid-cols-2">
         <div>
           <span className="inline-flex rounded-full bg-amber-100 px-4 py-2 text-sm font-semibold text-amber-800">
-            🥭 FRESH FROM THE ORCHARD
+            FRESH FROM THE ORCHARD
           </span>
 
           <h1 className="mt-6 max-w-xl text-4xl font-extrabold leading-tight tracking-tight text-stone-900 sm:text-6xl">
@@ -89,7 +90,13 @@ export default function Home() {
           <div className="absolute -bottom-16 -left-12 h-56 w-56 rounded-full bg-green-700/10" />
 
           <div className="relative text-center">
-            <div className="text-8xl sm:text-9xl">🥭</div>
+            <Image
+              src="/images/amrapali.jpeg"
+              alt="Freshly picked ripe mangoes on mango leaves"
+              width={176}
+              height={176}
+              className="mx-auto h-36 w-36 rounded-full object-cover shadow-lg ring-4 ring-white sm:h-44 sm:w-44"
+            />
             <p className="mt-5 text-xl font-extrabold text-green-900">
               From orchard to your door
             </p>
@@ -132,8 +139,14 @@ export default function Home() {
                 key={variety.name}
                 className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
               >
-                <div className="flex h-32 items-center justify-center rounded-xl bg-gradient-to-br from-amber-100 to-lime-100">
-                  <span className="text-6xl">{variety.emoji}</span>
+                <div className="relative h-40 overflow-hidden rounded-xl bg-amber-100">
+                  <Image
+                    src={variety.image}
+                    alt={`${variety.name} mangoes`}
+                    fill
+                    sizes="(min-width: 768px) 33vw, (min-width: 640px) 50vw, 100vw"
+                    className="object-cover"
+                  />
                 </div>
 
                 <p className="mt-5 text-xs font-bold uppercase tracking-wider text-amber-700">

@@ -22,5 +22,14 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/admin/:path*", "/seller/:path*", "/account/:path*", "/orders/:path*"],
+  matcher: [
+    "/",
+    "/admin/:path*",
+    "/seller/:path*",
+    "/account/:path*",
+    "/orders/:path*",
+    // Browsing orchards is public; ordering and order history need a login.
+    "/customer/orchards/:id/order",
+    "/customer/orders/:path*",
+  ],
 };
