@@ -448,7 +448,7 @@ export default function CustomerPage() {
             </div>
 
             {/* Batch Cards Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 gap-6">
               {filteredBatches.map((batch) => (
                 <div
                   key={batch.id}
@@ -544,7 +544,7 @@ export default function CustomerPage() {
                   brix: '20° – 21° Brix',
                   taste: 'Virtually stringless silky pulp with tiny flat stone. Savor fresh.',
                   origin: 'Rangpur & Rajshahi',
-                  img: '/images/mangoes.png',
+                  img: '/images/harivanga2.jpeg',
                 },
                 {
                   name: 'Himsagar (হিমসাগর)',
@@ -552,7 +552,7 @@ export default function CustomerPage() {
                   brix: '19° – 22° Brix',
                   taste: 'The King of early summer. Buttery, fiberless, sweet honeysuckle aroma.',
                   origin: 'Chapainawabganj',
-                  img: 'https://images.unsplash.com/photo-1553279768-865429fa0078?auto=format&fit=crop&w=600&q=80',
+                  img: '/images/himsagar.jpeg',
                 },
                 {
                   name: 'Langra (ল্যাংড়া)',
@@ -560,7 +560,7 @@ export default function CustomerPage() {
                   brix: '18° – 20° Brix',
                   taste: 'Bold sweet-tangy punch, stays light greenish even at full ripeness.',
                   origin: 'Padma Riverside, Rajshahi',
-                  img: 'https://images.unsplash.com/photo-1591073113125-e46713c829ed?auto=format&fit=crop&w=600&q=80',
+                  img: '/images/langra.jpeg',
                 },
                 {
                   name: 'Amrapali (আম্রপালি)',
@@ -568,7 +568,7 @@ export default function CustomerPage() {
                   brix: '22° – 24° Brix',
                   taste: 'Highest natural sugar concentration, deep saffron-red velvety flesh.',
                   origin: 'Satkhira & Chapai',
-                  img: 'https://images.unsplash.com/photo-1601493700631-2b16ec4b4716?auto=format&fit=crop&w=600&q=80',
+                  img: '/images/amrapali.jpeg',
                 },
               ].map((item, idx) => (
                 <div key={idx} className="p-4 bg-white rounded-2xl border border-stone-200 shadow-xs flex gap-4 items-center">
