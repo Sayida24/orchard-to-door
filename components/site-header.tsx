@@ -50,6 +50,11 @@ async function UserMenu() {
           Seller
         </Link>
       )}
+      {user.role === "CUSTOMER" && (
+        <Link href="/customer" className={ui.buttonSecondary}>
+          My dashboard
+        </Link>
+      )}
       <span className="hidden text-sm text-stone-600 sm:inline">Hi, {user.name.split(" ")[0]}</span>
       <SignOutButton />
     </>

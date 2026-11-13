@@ -1,13 +1,10 @@
 'use client';
 
 import mangoBackground from "./mango-bg.jpeg";
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   ShoppingBag,
   Sparkles,
-  RotateCw,
-  Play,
-  Pause,
   ShieldCheck,
   Truck,
   Gift,
@@ -23,7 +20,6 @@ import {
   Scale,
   BookOpen,
   ArrowRight,
-  Compass,
   Video,
   Image as ImageIcon,
   Trees,
@@ -44,7 +40,7 @@ interface Batch {
   availableKg: number;
   pricePerKg: number;
   harvestVideoUrl: string;
-  spinImages: string[];
+  photos: string[]; // batch photos shown in the order popup (first = card cover)
   sweetnessBrix: string;
   status: 'OPEN' | 'SOLD_OUT';
 }
@@ -76,7 +72,7 @@ const INITIAL_BATCHES: Batch[] = [
     availableKg: 380,
     pricePerKg: 155,
     harvestVideoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-wind-blowing-the-leaves-of-a-tall-tree-42523-large.mp4',
-    spinImages: [
+    photos: [
       '/images/mangoes.png',
       'https://images.unsplash.com/photo-1591073113125-e46713c829ed?auto=format&fit=crop&w=600&q=80',
       'https://images.unsplash.com/photo-1553279768-865429fa0078?auto=format&fit=crop&w=600&q=80',
@@ -95,7 +91,7 @@ const INITIAL_BATCHES: Batch[] = [
     availableKg: 420,
     pricePerKg: 140,
     harvestVideoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-farmer-walking-through-a-sunny-field-42702-large.mp4',
-    spinImages: [
+    photos: [
       'https://images.unsplash.com/photo-1553279768-865429fa0078?auto=format&fit=crop&w=600&q=80',
       'https://images.unsplash.com/photo-1591073113125-e46713c829ed?auto=format&fit=crop&w=600&q=80',
       'https://images.unsplash.com/photo-1601493700631-2b16ec4b4716?auto=format&fit=crop&w=600&q=80',
@@ -114,7 +110,7 @@ const INITIAL_BATCHES: Batch[] = [
     availableKg: 190,
     pricePerKg: 160,
     harvestVideoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-sun-beams-through-the-branches-of-a-tree-41315-large.mp4',
-    spinImages: [
+    photos: [
       'https://images.unsplash.com/photo-1591073113125-e46713c829ed?auto=format&fit=crop&w=600&q=80',
       'https://images.unsplash.com/photo-1553279768-865429fa0078?auto=format&fit=crop&w=600&q=80',
     ],
@@ -132,7 +128,7 @@ const INITIAL_BATCHES: Batch[] = [
     availableKg: 450,
     pricePerKg: 175,
     harvestVideoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-wind-blowing-the-leaves-of-a-tall-tree-42523-large.mp4',
-    spinImages: [
+    photos: [
       'https://images.unsplash.com/photo-1601493700631-2b16ec4b4716?auto=format&fit=crop&w=600&q=80',
       'https://images.unsplash.com/photo-1553279768-865429fa0078?auto=format&fit=crop&w=600&q=80',
     ],
@@ -199,21 +195,6 @@ export default function CustomerPage() {
   const [city, setCity] = useState('Dhaka');
   const [deliverySlot, setDeliverySlot] = useState('Tomorrow Morning (8:00 AM - 11:00 AM)');
   const [orderSuccessBanner, setOrderSuccessBanner] = useState(false);
-
-  // 360 Spin Viewer State inside Order Modal
-  const [spinFrame, setSpinFrame] = useState(0);
-  const [isAutoSpin, setIsAutoSpin] = useState(false);
-  const isDragging360 = useRef(false);
-  const startX360 = useRef(0);
-
-  // Auto-spin timer
-  useEffect(() => {
-    if (!isAutoSpin || !inspectBatch) return;
-    const interval = setInterval(() => {
-      setSpinFrame((prev) => (prev + 1) % inspectBatch.spinImages.length);
-    }, 300);
-    return () => clearInterval(interval);
-  }, [isAutoSpin, inspectBatch]);
 
   // Handle Order Placement (FR-09 to FR-11)
   const handlePlaceOrder = (e: React.FormEvent) => {
@@ -364,7 +345,7 @@ export default function CustomerPage() {
                   See your mangoes before you buy, and your own box before it ships.
                 </h1>
                 <p className="text-sm text-stone-300 leading-relaxed">
-                  Watch harvest picking videos, spin the fresh batch in 360°, and inspect your packed box with YOLOv8 AI disease verification.
+                  Browse fresh harvest batches straight from the orchard, then see your own packed box, checked by YOLOv8 AI for common visible diseases.
                 </p>
                 <div className="pt-2 flex flex-wrap gap-3">
                   <button
@@ -388,8 +369,8 @@ export default function CustomerPage() {
               {/* 3 Trust Markers */}
               <div className="mt-8 pt-6 border-t border-white/15 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs text-stone-300">
                 <div className="flex items-center gap-2">
-                  <RotateCw className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span>360° Batch Spin before ordering</span>
+                  <ImageIcon className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>Real batch photos before ordering</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -460,14 +441,14 @@ export default function CustomerPage() {
                     className="relative aspect-4/3 bg-stone-100 overflow-hidden cursor-pointer"
                   >
                     <img
-                      src={batch.spinImages[0]}
+                      src={batch.photos[0]}
                       alt={batch.varietyName}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20" />
 
                     <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-amber-400 text-[11px] px-2.5 py-1 rounded-md font-mono flex items-center gap-1">
-                      <RotateCw className="w-3 h-3" /> 360° Spinnable
+                      <ImageIcon className="w-3 h-3" /> {batch.photos.length} photos
                     </div>
 
                     <div className="absolute bottom-3 left-3 right-3 text-white flex justify-between items-center text-xs">
@@ -516,7 +497,7 @@ export default function CustomerPage() {
                       onClick={() => setInspectBatch(batch)}
                       className="w-full py-2.5 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors shadow-xs"
                     >
-                      Spin 360° & Configure Box <ChevronRight className="w-4 h-4" />
+                      View Batch & Order <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -705,7 +686,7 @@ export default function CustomerPage() {
       </main>
 
       {/* ======================================================== */}
-      {/* MODAL 1: 360° SPINNING BATCH & ORDER CONFIGURATOR (FR-07) */}
+      {/* MODAL 1: BATCH PHOTOS & ORDER CONFIGURATOR (FR-09 to FR-11) */}
       {/* ======================================================== */}
       {inspectBatch && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
@@ -722,45 +703,9 @@ export default function CustomerPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 p-6">
-              {/* Left Column: 360 Spin Viewer */}
-              <div className="lg:col-span-7 space-y-3">
-                <div className="relative rounded-2xl overflow-hidden aspect-4/3 bg-stone-900 border border-stone-200 shadow-inner select-none cursor-ew-resize">
-                  <img
-                    src={inspectBatch.spinImages[spinFrame] || inspectBatch.spinImages[0]}
-                    alt="360 harvest frame"
-                    className="w-full h-full object-cover pointer-events-none"
-                  />
-                  <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-md text-amber-400 text-xs px-2.5 py-1 rounded-md font-mono flex items-center gap-1.5">
-                    <Compass className="w-3.5 h-3.5" />
-                    <span>{Math.round((spinFrame / inspectBatch.spinImages.length) * 360)}°</span>
-                  </div>
-                  <div className="absolute bottom-3 inset-x-0 flex justify-center pointer-events-none">
-                    <div className="bg-black/60 backdrop-blur-md text-white text-[11px] px-3 py-1 rounded-full flex items-center gap-1.5">
-                      <RotateCw className="w-3.5 h-3.5 text-amber-400 animate-spin" />
-                      <span>Drag horizontally or scrub below to spin batch 360°</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 360 Controls */}
-                <div className="p-2.5 bg-stone-100 rounded-xl flex items-center justify-between gap-3 text-xs">
-                  <button
-                    onClick={() => setIsAutoSpin(!isAutoSpin)}
-                    className="px-3 py-1.5 bg-stone-900 text-white rounded-lg font-bold flex items-center gap-1.5"
-                  >
-                    {isAutoSpin ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                    <span>{isAutoSpin ? 'Pause' : 'Auto Spin'}</span>
-                  </button>
-                  <input
-                    type="range"
-                    min={0}
-                    max={inspectBatch.spinImages.length - 1}
-                    value={spinFrame}
-                    onChange={(e) => setSpinFrame(Number(e.target.value))}
-                    className="flex-1 accent-amber-500 cursor-pointer"
-                  />
-                  <span className="font-mono text-stone-500">Frame {spinFrame + 1} / {inspectBatch.spinImages.length}</span>
-                </div>
+              {/* Left Column: Batch Photos */}
+              <div className="lg:col-span-7">
+                <BatchPhotos key={inspectBatch.id} photos={inspectBatch.photos} name={inspectBatch.varietyName} />
               </div>
 
               {/* Right Column: Order Form (FR-09, FR-10) */}
@@ -990,6 +935,43 @@ export default function CustomerPage() {
           <p className="text-stone-400 pt-2">Chapainawabganj · Rajshahi · Satkhira · Rangpur</p>
         </div>
       </footer>
+    </div>
+  );
+}
+
+// Simple batch photo gallery: one large photo, tap a thumbnail to switch.
+function BatchPhotos({ photos, name }: { photos: string[]; name: string }) {
+  const [index, setIndex] = useState(0);
+  if (photos.length === 0) {
+    return (
+      <div className="rounded-2xl aspect-4/3 bg-stone-100 flex items-center justify-center text-sm text-stone-500">
+        No photos yet
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-3">
+      <div className="rounded-2xl overflow-hidden aspect-4/3 bg-stone-100 border border-stone-200">
+        <img src={photos[index]} alt={`${name} batch, photo ${index + 1} of ${photos.length}`} className="w-full h-full object-cover" />
+      </div>
+      {photos.length > 1 && (
+        <div className="flex gap-2">
+          {photos.map((src, i) => (
+            <button
+              key={src + i}
+              type="button"
+              onClick={() => setIndex(i)}
+              aria-label={`Show photo ${i + 1}`}
+              aria-current={i === index}
+              className={`h-16 w-20 shrink-0 overflow-hidden rounded-xl border-2 transition-colors ${
+                i === index ? 'border-amber-500' : 'border-transparent opacity-70 hover:opacity-100'
+              }`}
+            >
+              <img src={src} alt="" className="h-full w-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

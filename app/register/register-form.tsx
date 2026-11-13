@@ -21,7 +21,7 @@ export function RegisterForm() {
         redirect: false,
       });
       if (!login?.ok) return { message: "Account created. Please log in." };
-      router.push("/");
+      router.push("/customer"); // new accounts are always customers
       router.refresh();
       return result;
     },
