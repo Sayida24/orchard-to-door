@@ -12,6 +12,7 @@ export function openBatchWhere(now: Date): Prisma.BatchWhereInput {
     status: "OPEN",
     availableKg: { gt: 0 },
     OR: [{ closesAt: null }, { closesAt: { gt: now } }],
+    orchard: { isActive: true }, // an admin can pause an orchard: nothing from it is on sale
   };
 }
 

@@ -150,7 +150,9 @@ async function OrchardDetail({ params }: { params: Promise<{ id: string }> }) {
         </div>
         {orchard.batches.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-stone-300 p-5 text-stone-600">
-            Nothing on sale right now. Check back after the next harvest.
+            {orchard.isActive
+              ? "Nothing on sale right now. Check back after the next harvest."
+              : "This orchard isn't taking orders right now."}
           </p>
         ) : (
           <>
