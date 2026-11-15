@@ -14,8 +14,8 @@ export const metadata: Metadata = { title: "Notifications · Orchiva" };
 export default function NotificationsPage() {
   return (
     <main className="mx-auto w-full max-w-xl px-4 pb-12 pt-6">
-      <h1 className="mb-4 text-3xl font-extrabold tracking-tight text-stone-900">Notifications</h1>
-      <Suspense fallback={<div className="h-48 animate-pulse rounded-3xl bg-stone-200" aria-label="Loading notifications" />}>
+      <h1 className="mb-5 font-display text-[32px] font-semibold tracking-tight text-ink">Notifications</h1>
+      <Suspense fallback={<div className="h-48 animate-pulse rounded-3xl bg-line" aria-label="Loading notifications" />}>
         <NotificationList />
       </Suspense>
     </main>
@@ -39,7 +39,7 @@ async function NotificationList() {
     <div className="space-y-3">
       {unread > 0 && (
         <form action={markAllRead} className="flex items-center justify-between gap-3">
-          <p className="text-sm text-stone-600">{unread} unread</p>
+          <p className="text-sm text-muted">{unread} unread</p>
           <SubmitButton pendingText="Saving…" className={ui.buttonSecondary}>
             Mark all as read
           </SubmitButton>
@@ -52,20 +52,20 @@ async function NotificationList() {
               <input type="hidden" name="id" value={n.id} />
               <button
                 type="submit"
-                className={`flex w-full items-start gap-3 rounded-2xl border p-4 text-left hover:border-amber-400 ${
-                  n.isRead ? "border-stone-200 bg-white" : "border-amber-300 bg-amber-50"
+                className={`flex w-full items-start gap-3 rounded-[20px] border p-4 text-left hover:border-[#CFC7B5] ${
+                  n.isRead ? "border-line bg-white" : "border-[#F2D9A6] bg-mango-soft"
                 }`}
               >
                 <span
                   aria-hidden="true"
-                  className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${n.isRead ? "bg-transparent" : "bg-amber-600"}`}
+                  className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${n.isRead ? "bg-transparent" : "bg-[#C77700]"}`}
                 />
                 <span className="min-w-0 flex-1">
-                  <span className={`block ${n.isRead ? "text-stone-700" : "font-semibold text-stone-900"}`}>
+                  <span className={`block ${n.isRead ? "text-ink/80" : "font-semibold text-ink"}`}>
                     {n.message}
                     {!n.isRead && <span className="sr-only"> (unread)</span>}
                   </span>
-                  <span className="block text-xs text-stone-500">
+                  <span className="block text-xs text-muted">
                     {dateLabel(n.createdAt)}, {timeLabel(n.createdAt)}
                   </span>
                 </span>

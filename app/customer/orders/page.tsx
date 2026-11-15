@@ -1,28 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import type { OrderStatus } from "@prisma/client";
+import { Photo } from "@/components/photo";
 import { requireUser } from "@/lib/auth";
 import { expireUnapprovedOrders } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { dateLabel, orderNumber, taka } from "@/lib/shop";
+import { ORDER_STATUS } from "./status";
 
 export const metadata: Metadata = { title: "My orders · Orchiva" };
 
-const STATUS: Record<OrderStatus, { label: string; tone: string }> = {
-  PLACED: { label: "Waiting for seller", tone: "bg-amber-100 text-amber-900" },
-  APPROVED: { label: "Approved", tone: "bg-lime-100 text-lime-900" },
-  PACKED: { label: "Packed", tone: "bg-sky-100 text-sky-900" },
-  DISPATCHED: { label: "On the way", tone: "bg-indigo-100 text-indigo-900" },
-  DELIVERED: { label: "Delivered", tone: "bg-green-100 text-green-900" },
-  CANCELLED: { label: "Cancelled", tone: "bg-stone-200 text-stone-800" },
-};
-
 export default function MyOrdersPage() {
   return (
-    <main className="mx-auto w-full max-w-xl px-4 pb-12 pt-6">
-      <h1 className="mb-4 text-3xl font-extrabold tracking-tight text-stone-900">My orders</h1>
-      <Suspense fallback={<div className="h-48 animate-pulse rounded-3xl bg-stone-200" aria-label="Loading orders" />}>
+    <main className="mx-auto w-full max-w-xl px-4 pb-14 pt-6">
+      <h1 className="mb-5 font-display text-[32px] font-semibold tracking-tight text-ink">My orders</h1>
+      <Suspense fallback={<div className="h-48 animate-pulse rounded-3xl bg-line" aria-label="Loading orders" />}>
         <OrderList />
       </Suspense>
     </main>
@@ -35,14 +27,17 @@ async function OrderList() {
   const orders = await prisma.order.findMany({
     where: { customerId: user.id },
     orderBy: { createdAt: "desc" },
-    include: { batch: { select: { variety: { select: { name: true } }, orchard: { select: { name: true } } } } },
+    include: {
+      batch: { select: { variety: { select: { name: true } }, orchard: { select: { name: true, photoUrls: true } } } },
+    },
   });
 
   if (orders.length === 0) {
     return (
-      <div className="space-y-3 rounded-2xl border border-dashed border-stone-300 p-6 text-center">
-        <p className="text-stone-700">You haven&apos;t ordered yet.</p>
-        <Link href="/customer" className="inline-flex min-h-11 items-center rounded-2xl bg-amber-500 px-5 font-bold text-stone-900 hover:bg-amber-400">
+      <div className="space-y-4 rounded-3xl border border-dashed border-[#D6CEBC] bg-white/60 p-8 text-center">
+        <p className="font-display text-xl font-semibold text-ink">You haven&apos;t ordered yet.</p>
+        <p className="text-muted">Watch today&apos;s harvest, pick an orchard, and order any amount.</p>
+        <Link href="/customer" className="inline-flex h-12 items-center rounded-2xl bg-mango px-6 font-bold text-ink hover:bg-mango-dark">
           Browse orchards
         </Link>
       </div>
@@ -51,27 +46,34 @@ async function OrderList() {
 
   return (
     <ul className="space-y-3">
-      {orders.map((o) => (
-        <li key={o.id}>
-          <Link href={`/customer/orders/${o.id}`} className="block rounded-2xl border border-stone-200 bg-white p-4 hover:border-amber-400">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="font-bold text-stone-900">
-                  {o.batch.variety.name} · {o.quantityKg} kg
-                </p>
-                <p className="truncate text-sm text-stone-600">{o.batch.orchard.name}</p>
-                <p className="text-sm text-stone-600">
+      {orders.map((o) => {
+        const status = ORDER_STATUS[o.status];
+        return (
+          <li key={o.id}>
+            <Link
+              href={`/customer/orders/${o.id}`}
+              className="flex items-center gap-3.5 rounded-3xl border border-line bg-white p-3.5 transition hover:border-[#CFC7B5] hover:shadow-[0_10px_28px_rgba(27,42,31,0.07)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-leaf"
+            >
+              <span className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-line">
+                <Photo src={o.batch.orchard.photoUrls[0] ?? "/images/orchard.png"} alt="" className="h-full w-full object-cover" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold text-ink">
+                  {o.quantityKg} kg {o.batch.variety.name}
+                </span>
+                <span className="block truncate text-[13px] text-muted">{o.batch.orchard.name}</span>
+                <span className="block text-[13px] text-muted">
                   #{orderNumber(o.id)} · {dateLabel(o.createdAt)}
-                </p>
-              </div>
-              <div className="shrink-0 text-right">
-                <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-bold ${STATUS[o.status].tone}`}>{STATUS[o.status].label}</span>
-                <p className="mt-1 font-bold text-stone-900">{taka(o.totalPrice)}</p>
-              </div>
-            </div>
-          </Link>
-        </li>
-      ))}
+                </span>
+              </span>
+              <span className="shrink-0 text-right">
+                <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-bold ${status.tone}`}>{status.label}</span>
+                <span className="mt-1.5 block font-display text-lg font-bold text-ink">{taka(o.totalPrice)}</span>
+              </span>
+            </Link>
+          </li>
+        );
+      })}
     </ul>
   );
 }

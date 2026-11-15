@@ -28,30 +28,30 @@ export function HarvestVideos({ videos, label }: { videos: VideoItem[]; label: s
         playsInline
         preload="none"
         aria-label={`${label}: ${current.title}`}
-        className="aspect-video w-full rounded-2xl bg-stone-900 object-cover"
+        className="aspect-video w-full rounded-[20px] bg-ink object-cover"
       />
       <div>
-        <p className="font-bold text-stone-900">{current.title}</p>
-        <p className="text-sm text-stone-600">{current.meta}</p>
+        <p className="font-semibold text-ink">{current.title}</p>
+        <p className="text-sm text-muted">{current.meta}</p>
       </div>
       {videos.length > 1 && (
-        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
           {videos.map((v, i) => (
             <li key={v.id}>
               <button
                 type="button"
                 onClick={() => setIndex(i)}
                 aria-pressed={i === index}
-                className={`w-full overflow-hidden rounded-2xl border-2 bg-white text-left transition ${
-                  i === index ? "border-amber-500" : "border-stone-200 hover:border-stone-400"
+                className={`flex w-full items-center gap-2.5 rounded-2xl bg-white p-2 text-left transition ${
+                  i === index ? "border-2 border-leaf" : "border border-line hover:border-[#CFC7B5]"
                 }`}
               >
-                <span className="block h-24 bg-stone-200">
+                <span className="block h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-line">
                   {v.posterUrl && <Photo src={v.posterUrl} alt="" className="h-full w-full object-cover" />}
                 </span>
-                <span className="block px-3 py-2">
-                  <span className="block text-sm font-bold leading-snug text-stone-900">{v.title}</span>
-                  <span className="block text-xs text-stone-600">{v.meta}</span>
+                <span className="min-w-0">
+                  <span className="block truncate text-[13px] font-semibold text-ink">{v.title}</span>
+                  <span className="block text-xs text-muted">{v.meta}</span>
                 </span>
               </button>
             </li>

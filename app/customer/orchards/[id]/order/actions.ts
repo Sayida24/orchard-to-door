@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { APPROVAL_HOURS, expireUnapprovedOrders } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
-import { deliverySlots, GIFT_BOX_FEE, openBatchWhere, taka } from "@/lib/shop";
+import { deliveryDays, GIFT_BOX_FEE, openBatchWhere, taka } from "@/lib/shop";
 
 export type PlaceOrderState = { error?: string } | undefined;
 
@@ -25,13 +25,16 @@ export async function placeOrder(_prev: PlaceOrderState, fd: FormData): Promise<
   const areaId = String(fd.get("areaId") ?? "");
   const address = String(fd.get("address") ?? "").trim().slice(0, 200);
   const landmark = String(fd.get("landmark") ?? "").trim().slice(0, 120);
-  const slot = String(fd.get("slot") ?? "");
+  const day = String(fd.get("day") ?? "");
+  const availability = String(fd.get("availability") ?? "").trim().replace(/\s+/g, " ").slice(0, 60);
   const shownPrice = Number(fd.get("price"));
   const now = new Date();
 
   if (!Number.isInteger(kg) || kg < 1) return { error: "Choose how many kg you want (at least 1 kg)." };
   if (address.length < 5) return { error: "Enter your house, flat and road." };
-  if (!deliverySlots(now).includes(slot)) return { error: "Choose a delivery time again — the times have changed." };
+  if (!deliveryDays(now).includes(day)) return { error: "Choose your delivery day again: the dates have changed." };
+  // e.g. "Wed 18 Nov · after 5 PM": shown to the seller, in their notification, and on the order page.
+  const slot = `${day} · ${availability || "any time"}`;
 
   const area = await prisma.deliveryArea.findFirst({ where: { id: areaId, isActive: true } });
   if (!area) return { error: "Choose your area in Dhaka." };

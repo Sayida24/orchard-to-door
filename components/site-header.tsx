@@ -2,18 +2,20 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { ui } from "@/lib/ui";
 import { SignOutButton } from "./sign-out-button";
+
+const pill =
+  "inline-flex h-11 items-center rounded-full border border-line bg-white px-4 text-sm font-semibold text-ink hover:border-[#CFC7B5] hover:bg-cream";
 
 // The logo renders instantly; the user menu reads the session, so it streams in.
 export function SiteHeader() {
   return (
-    <header className="relative z-10 w-full border-b border-stone-200 bg-white">
-      <div className="mx-auto flex h-16 w-full max-w-5xl items-center justify-between gap-3 px-4">
-        <Link href="/" className="text-xl font-extrabold tracking-tight text-stone-900">
+    <header className="relative z-20 w-full border-b border-line/70 bg-cream/95 backdrop-blur">
+      <div className="mx-auto flex h-[68px] w-full max-w-5xl items-center justify-between gap-3 px-4">
+        <Link href="/" className="font-display text-[26px] font-bold tracking-tight text-leaf">
           Orchiva
         </Link>
-        <nav className="flex items-center gap-2">
+        <nav aria-label="Account" className="flex items-center gap-2">
           <Suspense fallback={<div className="h-11 w-24" />}>
             <UserMenu />
           </Suspense>
@@ -30,14 +32,14 @@ async function NotificationBell({ userId }: { userId: string }) {
     <Link
       href="/notifications"
       aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}
-      className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-stone-300 bg-white text-stone-800 hover:bg-stone-50"
+      className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line bg-white text-ink hover:border-[#CFC7B5] hover:bg-cream"
     >
       <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
         <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
       </svg>
       {unread > 0 && (
-        <span className="absolute -right-1.5 -top-1.5 min-w-5 rounded-full bg-red-600 px-1 text-center text-xs font-bold leading-5 text-white">
+        <span className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-[#B42318] px-1 text-center text-[11px] font-bold leading-[18px] text-white">
           {unread > 9 ? "9+" : unread}
         </span>
       )}
@@ -51,10 +53,10 @@ async function UserMenu() {
   if (!user) {
     return (
       <>
-        <Link href="/login" className={ui.buttonSecondary}>
+        <Link href="/login" className={pill}>
           Log in
         </Link>
-        <Link href="/register" className={`${ui.button} min-h-11 px-4 py-2 text-sm`}>
+        <Link href="/register" className="inline-flex h-11 items-center rounded-full bg-mango px-4 text-sm font-bold text-ink hover:bg-mango-dark">
           Sign up
         </Link>
       </>
@@ -64,28 +66,28 @@ async function UserMenu() {
   return (
     <>
       {user.role === "ADMIN" && (
-        <Link href="/admin" className={ui.buttonSecondary}>
+        <Link href="/admin" className={pill}>
           Admin
         </Link>
       )}
       {user.role === "SELLER" && (
-        <Link href="/seller" className={ui.buttonSecondary}>
+        <Link href="/seller" className={pill}>
           Seller
         </Link>
       )}
       {user.role === "CUSTOMER" && (
         <>
           {/* On phones the logo already leads customers to the orchards */}
-          <Link href="/customer" className={`${ui.buttonSecondary} hidden sm:inline-flex`}>
+          <Link href="/customer" className={`${pill} hidden sm:inline-flex`}>
             Orchards
           </Link>
-          <Link href="/customer/orders" className={ui.buttonSecondary}>
+          <Link href="/customer/orders" className={pill}>
             My orders
           </Link>
         </>
       )}
       <NotificationBell userId={user.id} />
-      <span className="hidden text-sm text-stone-600 sm:inline">Hi, {user.name.split(" ")[0]}</span>
+      <span className="hidden text-sm text-muted md:inline">Hi, {user.name.split(" ")[0]}</span>
       <SignOutButton />
     </>
   );
