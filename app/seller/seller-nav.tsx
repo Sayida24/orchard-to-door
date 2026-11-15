@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 // harvest video storage (Part B) and smart packing (Part C).
 const links = [
   { href: "/seller", label: "Overview" },
+  { href: "/seller/orchards", label: "My orchards" },
   { href: "/seller/batches", label: "Harvest batches" },
   { href: "/seller/orders", label: "Orders & packing" },
 ];

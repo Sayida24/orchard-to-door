@@ -5,28 +5,30 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { fail, optStr, str, type FormState } from "@/lib/form";
 import { prisma } from "@/lib/prisma";
+import { deletePhoto } from "@/lib/storage";
 
-// FR-22: create or update an orchard. Each orchard belongs to one seller.
+// Sellers create and own their orchards (FR-22). The admin can only correct the
+// details, e.g. a typo in the name; the seller and the photo stay as they are.
 export async function saveOrchard(_prev: FormState, fd: FormData): Promise<FormState> {
   await requireUser(["ADMIN"]);
 
   const id = str(fd, "id");
-  const name = str(fd, "name");
-  const location = str(fd, "location");
-  const description = optStr(fd, "description");
-  const sellerId = str(fd, "sellerId");
+  const name = str(fd, "name").replace(/\s+/g, " ");
+  const location = str(fd, "location").replace(/\s+/g, " ");
+  const description = optStr(fd, "description")?.slice(0, 600) ?? null;
 
-  if (name.length < 2) return fail(fd, "Enter the orchard name.");
-  if (location.length < 2) return fail(fd, "Enter the location, e.g. Shibganj, Chapainawabganj.");
-  const seller = await prisma.user.findFirst({ where: { id: sellerId, role: "SELLER" } });
-  if (!seller) return fail(fd, "Choose the seller who runs this orchard.");
+  if (name.length < 2 || name.length > 60) return fail(fd, "Enter the orchard name.");
+  if (location.length < 2 || location.length > 80) return fail(fd, "Enter the location, e.g. Shibganj, Chapainawabganj.");
 
-  const data = { name, location, description, sellerId };
-  if (id) await prisma.orchard.update({ where: { id }, data });
-  else await prisma.orchard.create({ data: { ...data, photoUrls: [] } });
+  const updated = await prisma.orchard.updateMany({ where: { id }, data: { name, location, description } });
+  if (updated.count === 0) return fail(fd, "This orchard no longer exists.");
 
   revalidatePath("/admin/orchards");
-  redirect("/admin/orchards");
+  revalidatePath(`/admin/orchards/${id}`);
+  revalidatePath("/customer");
+  revalidatePath(`/customer/orchards/${id}`);
+  revalidatePath("/seller/orchards");
+  redirect(`/admin/orchards/${id}`);
 }
 
 // Pause: the orchard disappears for customers and takes no new orders; orders already
@@ -62,7 +64,9 @@ export async function deleteOrchard(fd: FormData) {
   await requireUser(["ADMIN"]);
   const id = str(fd, "id");
   if ((await prisma.batch.count({ where: { orchardId: id } })) > 0) return;
-  await prisma.orchard.delete({ where: { id } });
+  const { photoUrls } = await prisma.orchard.delete({ where: { id }, select: { photoUrls: true } });
+  await Promise.all(photoUrls.map((url) => deletePhoto(url).catch(() => {})));
   revalidatePath("/admin/orchards");
+  revalidatePath("/seller/orchards");
   redirect("/admin/orchards");
 }

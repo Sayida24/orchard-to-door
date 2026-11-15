@@ -24,20 +24,30 @@ async function NewBatch() {
   const user = await requireUser(["SELLER"]);
   const [orchards, varieties] = await Promise.all([
     prisma.orchard.findMany({
-      where: { sellerId: user.id, isActive: true },
+      where: { sellerId: user.id },
       orderBy: { name: "asc" },
-      select: { id: true, name: true },
+      select: { id: true, name: true, isActive: true },
     }),
     prisma.variety.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
+  const active = orchards.filter((o) => o.isActive).map(({ id, name }) => ({ id, name }));
 
   if (orchards.length === 0) {
     return (
+      <div className={`${ui.card} space-y-3`}>
+        <p className="text-stone-700">First create your orchard profile, then list its harvest here.</p>
+        <Link href="/seller/orchards/new" className={ui.button}>
+          Create your orchard
+        </Link>
+      </div>
+    );
+  }
+  if (active.length === 0) {
+    return (
       <p className={`${ui.card} text-stone-700`}>
-        You don&apos;t have an orchard that can sell right now. An admin sets up orchards, and a paused orchard can&apos;t list
-        batches.
+        An admin has paused your orchard, so it can&apos;t list batches right now.
       </p>
     );
   }
-  return <BatchForm orchards={orchards} varieties={varieties} />;
+  return <BatchForm orchards={active} varieties={varieties} />;
 }

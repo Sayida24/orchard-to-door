@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
+import { Photo } from "@/components/photo";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { NO_QUALITY_DATA, orchardQuality } from "@/lib/quality";
@@ -9,12 +10,11 @@ import { ui } from "@/lib/ui";
 export default function OrchardsPage() {
   return (
     <main>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">Orchards</h1>
-        <Link href="/admin/orchards/new" className={`${ui.button} px-4 py-2 text-sm`}>
-          + New orchard
-        </Link>
-      </div>
+      <h1 className="text-2xl font-bold">Orchards</h1>
+      <p className="mb-4 text-sm text-stone-600">
+        Sellers create their own orchards after you give them an account (Users → Add seller). You can pause an orchard
+        or fix its details.
+      </p>
       <Suspense fallback={<p className="text-stone-500">Loading orchards…</p>}>
         <OrchardList />
       </Suspense>
@@ -34,7 +34,11 @@ async function OrchardList() {
   ]);
 
   if (orchards.length === 0) {
-    return <p className={`${ui.card} text-stone-600`}>No orchards yet. Create the first one.</p>;
+    return (
+      <p className={`${ui.card} text-stone-600`}>
+        No orchards yet. They appear here when sellers create them.
+      </p>
+    );
   }
 
   // Orchards that need attention first, then the rest by name.
@@ -48,8 +52,15 @@ async function OrchardList() {
         <li key={o.id}>
           <Link
             href={`/admin/orchards/${o.id}`}
-            className={`${ui.card} block h-full space-y-1 hover:border-amber-400 ${o.q.flagged ? "border-red-300" : ""}`}
+            className={`${ui.card} block h-full space-y-1 overflow-hidden hover:border-amber-400 ${o.q.flagged ? "border-red-300" : ""}`}
           >
+            <div className="-mx-5 -mt-5 mb-3 h-32 bg-stone-200">
+              {o.photoUrls[0] ? (
+                <Photo src={o.photoUrls[0]} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <p className="flex h-full items-center justify-center text-sm text-stone-600">No photo</p>
+              )}
+            </div>
             <div className="flex flex-wrap items-center gap-2">
               <p className="font-semibold">{o.name}</p>
               {!o.isActive && <span className="rounded-full bg-stone-800 px-2 py-0.5 text-xs font-bold text-white">Paused</span>}

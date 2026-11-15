@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ui } from "@/lib/ui";
 import { setUserRole } from "./actions";
+import { AddSeller } from "./add-seller";
 import { ResetLinkButton } from "./reset-link";
 
 const roleBadge: Record<Role, string> = {
@@ -16,6 +17,9 @@ export default function AdminUsersPage() {
   return (
     <main>
       <h1 className="mb-4 text-2xl font-bold">Users and roles</h1>
+      <div className="mb-6">
+        <AddSeller />
+      </div>
       <Suspense fallback={<p className="text-stone-500">Loading users…</p>}>
         <UserList />
       </Suspense>
