@@ -7,7 +7,18 @@ import { ui } from "@/lib/ui";
 import { cancelOrder } from "./actions";
 
 // Collapsed until the seller asks; they must pick a reason, which the customer sees.
-export function CancelOrder({ orderId }: { orderId: string }) {
+// Used to decline a new order and to cancel an approved one before packing.
+export function CancelOrder({
+  orderId,
+  label = "Cancel order",
+  question = "Why are you cancelling?",
+  confirm = "Cancel this order",
+}: {
+  orderId: string;
+  label?: string;
+  question?: string;
+  confirm?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const choice = CANCEL_REASONS.find((c) => c.reason === reason);
@@ -15,7 +26,7 @@ export function CancelOrder({ orderId }: { orderId: string }) {
   if (!open) {
     return (
       <button type="button" onClick={() => setOpen(true)} className={ui.buttonSecondary}>
-        Cancel order
+        {label}
       </button>
     );
   }
@@ -24,7 +35,7 @@ export function CancelOrder({ orderId }: { orderId: string }) {
     <form action={cancelOrder} className="w-full space-y-2 rounded-xl border border-red-200 bg-red-50 p-3">
       <input type="hidden" name="orderId" value={orderId} />
       <label htmlFor={`reason-${orderId}`} className="text-sm font-semibold text-red-900">
-        Why are you cancelling?
+        {question}
       </label>
       <select
         id={`reason-${orderId}`}
@@ -54,7 +65,7 @@ export function CancelOrder({ orderId }: { orderId: string }) {
           pendingText="Cancelling…"
           className={`${ui.buttonSecondary} border-red-300 text-red-700 hover:bg-red-100 disabled:opacity-50`}
         >
-          Cancel this order
+          {confirm}
         </SubmitButton>
         <button type="button" onClick={() => setOpen(false)} className={ui.buttonSecondary}>
           Keep it

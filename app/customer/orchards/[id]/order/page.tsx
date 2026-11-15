@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { requireUser } from "@/lib/auth";
+import { expireUnapprovedOrders } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { dayLabel, deliverySlots, GIFT_BOX_FEE, openBatchWhere } from "@/lib/shop";
 import { OrderForm } from "./order-form";
@@ -22,6 +23,7 @@ export default function OrderPage({ params }: PageProps<"/customer/orchards/[id]
 async function OrderContent({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   const { id } = await params;
+  await expireUnapprovedOrders(); // kg held by orders nobody approved in 24 hours go back on sale
   const now = new Date();
 
   const [orchard, areas] = await Promise.all([

@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { COMPLAINT_REASONS } from "@/lib/shop";
-import { confirmDelivery, reportProblem, submitReview, type FeedbackState } from "./actions";
+import { cancelMyOrder, confirmDelivery, reportProblem, submitReview, type FeedbackState } from "./actions";
 
 const field =
   "w-full rounded-2xl border border-stone-300 bg-white px-3 text-base text-stone-900 placeholder:text-stone-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200";
@@ -13,6 +13,39 @@ function ErrorNote({ text }: { text?: string }) {
       {text}
     </p>
   ) : null;
+}
+
+// Before the seller approves, the customer can cancel. Asks once more before cancelling.
+export function CancelMyOrder({ orderId }: { orderId: string }) {
+  const [sure, setSure] = useState(false);
+  const [state, action, pending] = useActionState<FeedbackState, FormData>(cancelMyOrder, undefined);
+
+  if (!sure) {
+    return (
+      <button
+        type="button"
+        onClick={() => setSure(true)}
+        className="min-h-11 rounded-2xl border border-stone-300 bg-white px-4 text-sm font-semibold text-stone-900 hover:bg-stone-50"
+      >
+        Cancel my order
+      </button>
+    );
+  }
+  return (
+    <form action={action} className="space-y-2">
+      <input type="hidden" name="orderId" value={orderId} />
+      <p className="text-sm font-semibold text-stone-900">Cancel this order? The seller will be told.</p>
+      <ErrorNote text={state?.error} />
+      <div className="flex flex-wrap gap-2">
+        <button type="submit" disabled={pending} className="min-h-11 rounded-2xl bg-red-700 px-4 text-sm font-bold text-white hover:bg-red-600 disabled:opacity-60">
+          {pending ? "Cancelling…" : "Yes, cancel it"}
+        </button>
+        <button type="button" onClick={() => setSure(false)} className="min-h-11 rounded-2xl border border-stone-300 bg-white px-4 text-sm font-semibold text-stone-900 hover:bg-stone-50">
+          Keep my order
+        </button>
+      </div>
+    </form>
+  );
 }
 
 // Shown while the order is on its way: the customer confirms it arrived (FR-19).

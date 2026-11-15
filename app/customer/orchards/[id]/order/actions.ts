@@ -3,6 +3,7 @@
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
+import { APPROVAL_HOURS, expireUnapprovedOrders } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { deliverySlots, GIFT_BOX_FEE, openBatchWhere, taka } from "@/lib/shop";
 
@@ -15,6 +16,7 @@ class OrderProblem extends Error {}
 // Everything is re-checked here; the browser's numbers are never trusted.
 export async function placeOrder(_prev: PlaceOrderState, fd: FormData): Promise<PlaceOrderState> {
   const user = await requireUser();
+  await expireUnapprovedOrders(); // free kg held by orders nobody approved in 24 hours
 
   const orchardId = String(fd.get("orchardId") ?? "");
   const batchId = String(fd.get("batchId") ?? "");
@@ -83,7 +85,7 @@ export async function placeOrder(_prev: PlaceOrderState, fd: FormData): Promise<
         await tx.notification.create({
           data: {
             userId: batch.sellerId,
-            message: `New order: ${kg} kg ${batch.variety.name} to ${area.name}, ${slot}`,
+            message: `New order to approve within ${APPROVAL_HOURS} hours: ${kg} kg ${batch.variety.name} to ${area.name}, ${slot}`,
             link: "/seller/orders",
           },
         });

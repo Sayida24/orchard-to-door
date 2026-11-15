@@ -5,6 +5,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { Photo } from "@/components/photo";
 import { getCurrentUser } from "@/lib/auth";
+import { expireUnapprovedOrders } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { dhakaDayStart, openBatchWhere, taka } from "@/lib/shop";
 
@@ -29,6 +30,7 @@ async function Orchards({ searchParams }: { searchParams: Promise<Record<string,
   const variety = typeof sp.variety === "string" ? sp.variety : "";
   const q = typeof sp.q === "string" ? sp.q.trim().slice(0, 60) : "";
   await connection(); // "today" depends on the request time, so never prerender this part
+  await expireUnapprovedOrders(); // kg held by orders nobody approved in 24 hours go back on sale
   const now = new Date();
   const today = dhakaDayStart(now);
   const like = { contains: q, mode: "insensitive" as const };

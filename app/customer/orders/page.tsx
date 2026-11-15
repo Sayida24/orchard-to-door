@@ -3,13 +3,15 @@ import Link from "next/link";
 import { Suspense } from "react";
 import type { OrderStatus } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
+import { expireUnapprovedOrders } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { dateLabel, orderNumber, taka } from "@/lib/shop";
 
 export const metadata: Metadata = { title: "My orders · Orchiva" };
 
 const STATUS: Record<OrderStatus, { label: string; tone: string }> = {
-  PLACED: { label: "Placed", tone: "bg-amber-100 text-amber-900" },
+  PLACED: { label: "Waiting for seller", tone: "bg-amber-100 text-amber-900" },
+  APPROVED: { label: "Approved", tone: "bg-lime-100 text-lime-900" },
   PACKED: { label: "Packed", tone: "bg-sky-100 text-sky-900" },
   DISPATCHED: { label: "On the way", tone: "bg-indigo-100 text-indigo-900" },
   DELIVERED: { label: "Delivered", tone: "bg-green-100 text-green-900" },
@@ -29,6 +31,7 @@ export default function MyOrdersPage() {
 
 async function OrderList() {
   const user = await requireUser();
+  await expireUnapprovedOrders(); // the 24-hour approval rule
   const orders = await prisma.order.findMany({
     where: { customerId: user.id },
     orderBy: { createdAt: "desc" },

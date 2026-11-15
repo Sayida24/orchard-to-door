@@ -8,11 +8,13 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { CONFIRM_FALLBACK_DAYS, DAY_MS, dateLabel, orderNumber, taka, timeLabel } from "@/lib/shop";
 import { ui } from "@/lib/ui";
-import { completeReport, dispatchOrder, markDelivered, packOrder } from "./actions";
+import { approvalHoursLeft, expireUnapprovedOrders } from "@/lib/orders";
+import { approveOrder, completeReport, dispatchOrder, markDelivered, packOrder } from "./actions";
 import { CancelOrder } from "./cancel-order";
 
 const TABS: { key: string; status: OrderStatus; label: string }[] = [
-  { key: "new", status: "PLACED", label: "To pack" },
+  { key: "new", status: "PLACED", label: "To approve" },
+  { key: "approved", status: "APPROVED", label: "To pack" },
   { key: "packed", status: "PACKED", label: "To dispatch" },
   { key: "dispatched", status: "DISPATCHED", label: "On the way" },
   { key: "delivered", status: "DELIVERED", label: "Delivered" },
@@ -36,7 +38,7 @@ function loadOrders(sellerId: string, status: OrderStatus) {
   return prisma.order.findMany({
     where: { batch: { sellerId }, status },
     // Work queues show the oldest first; history shows the newest first.
-    orderBy: { createdAt: status === "PLACED" || status === "PACKED" ? "asc" : "desc" },
+    orderBy: { createdAt: status === "PLACED" || status === "APPROVED" || status === "PACKED" ? "asc" : "desc" },
     take: 100,
     include: {
       customer: { select: { name: true, phone: true } },
@@ -52,6 +54,7 @@ type Row = Awaited<ReturnType<typeof loadOrders>>[number];
 async function Orders({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const user = await requireUser(["SELLER"]);
   await connection();
+  await expireUnapprovedOrders(); // the 24-hour rule, checked whenever orders are looked at
   const show = (await searchParams).show;
   const tab = TABS.find((t) => t.key === show) ?? TABS[0];
   const now = new Date();
@@ -212,14 +215,39 @@ function OrderActions({ o, now }: { o: Row; now: Date }) {
   const first = o.customer.name.split(" ")[0];
 
   switch (o.status) {
-    case "PLACED":
+    case "PLACED": {
+      const left = approvalHoursLeft(o.createdAt, now);
       return (
-        <div className="flex flex-wrap items-start gap-2 border-t border-stone-100 pt-3">
-          <form action={packOrder}>
-            {hidden}
-            <SubmitButton pendingText="Saving…">Mark packed</SubmitButton>
-          </form>
-          <CancelOrder orderId={o.id} />
+        <div className="space-y-2 border-t border-stone-100 pt-3">
+          <p className={`text-sm font-semibold ${left <= 6 ? "text-red-800" : "text-amber-900"}`}>
+            Approve within {left} hour{left === 1 ? "" : "s"}, or it&apos;s cancelled automatically. The {o.quantityKg} kg are
+            held for this customer until then.
+          </p>
+          <div className="flex flex-wrap items-start gap-2">
+            <form action={approveOrder}>
+              {hidden}
+              <SubmitButton pendingText="Approving…">Approve</SubmitButton>
+            </form>
+            <CancelOrder orderId={o.id} label="Decline" question="Why are you declining?" confirm="Decline this order" />
+          </div>
+        </div>
+      );
+    }
+    case "APPROVED":
+      return (
+        <div className="space-y-1 border-t border-stone-100 pt-3">
+          <div className="flex flex-wrap items-start gap-2">
+            <form action={packOrder}>
+              {hidden}
+              <SubmitButton pendingText="Saving…">Mark packed</SubmitButton>
+            </form>
+            <CancelOrder orderId={o.id} />
+          </div>
+          {o.approvedAt && (
+            <p className="text-xs text-stone-500">
+              Approved {dateLabel(o.approvedAt)}, {timeLabel(o.approvedAt)}
+            </p>
+          )}
         </div>
       );
     case "PACKED":

@@ -39,19 +39,24 @@ async function ManageBatch({
     include: {
       variety: { select: { name: true } },
       orchard: { select: { name: true, isActive: true } },
-      orders: { where: { status: { not: "CANCELLED" } }, select: { quantityKg: true } },
+      orders: { where: { status: { not: "CANCELLED" } }, select: { quantityKg: true, status: true } },
     },
   });
   if (!batch) notFound();
 
   const now = new Date();
   const state = batchState(batch, now);
-  const soldKg = batch.orders.reduce((n, o) => n + o.quantityKg, 0);
   const editable = state.key !== "ended";
+  // New orders hold their kg until the seller approves them; approved ones count as sold.
+  const waiting = batch.orders.filter((o) => o.status === "PLACED");
+  const sold = batch.orders.filter((o) => o.status !== "PLACED");
+  const kgOf = (list: { quantityKg: number }[]) => list.reduce((n, o) => n + o.quantityKg, 0);
+  const orders = (n: number) => `${n} order${n === 1 ? "" : "s"}`;
   const facts = [
     { label: "Price", value: `${taka(batch.pricePerKg)}/kg` },
-    { label: "Kg left", value: `${Math.floor(batch.availableKg)} of ${Math.floor(batch.totalKg)}` },
-    { label: "Sold", value: `${soldKg} kg · ${batch.orders.length} order${batch.orders.length === 1 ? "" : "s"}` },
+    { label: "Left to sell", value: `${Math.floor(batch.availableKg)} kg` },
+    { label: "Waiting for approval", value: `${kgOf(waiting)} kg · ${orders(waiting.length)}` },
+    { label: "Sold", value: `${kgOf(sold)} kg · ${orders(sold.length)}` },
   ];
 
   return (
@@ -73,7 +78,7 @@ async function ManageBatch({
         </p>
       </div>
 
-      <dl className={`${ui.card} grid grid-cols-3 gap-3`}>
+      <dl className={`${ui.card} grid grid-cols-2 gap-3 sm:grid-cols-4`}>
         {facts.map((f) => (
           <div key={f.label}>
             <dt className="text-xs text-stone-500">{f.label}</dt>

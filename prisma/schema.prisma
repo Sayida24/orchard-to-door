@@ -21,7 +21,8 @@ enum BatchStatus {
 }
 
 enum OrderStatus {
-  PLACED
+  PLACED // waiting for the seller to approve (the kg are held)
+  APPROVED // the seller accepted it
   PACKED
   DISPATCHED
   DELIVERED
@@ -159,11 +160,12 @@ model Order {
   paymentMethod  PaymentMethod @default(CASH_ON_DELIVERY)
   status         OrderStatus   @default(PLACED)
   createdAt      DateTime      @default(now())
+  approvedAt     DateTime? // the seller approves within 24 hours, or the order is cancelled
   packedAt       DateTime?
   dispatchedAt   DateTime?
   deliveredAt    DateTime? // set when the customer confirms (or the seller, 2 days after dispatch)
   cancelledAt    DateTime?
-  cancelReason   String? // the seller can cancel before packing
+  cancelReason   String? // seller (before packing), customer (before approval) or the 24-hour rule
   customerId     String
   customer       User          @relation("CustomerOrders", fields: [customerId], references: [id])
   batchId        String
@@ -171,6 +173,8 @@ model Order {
   boxes          Box[] // a big order is packed in several boxes
   complaints     Complaint[]
   review         Review?
+
+  @@index([status, createdAt]) // finds orders waiting longer than 24 hours
 }
 
 model Box {
