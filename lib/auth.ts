@@ -40,12 +40,14 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.role = user.role;
+        token.loginAt = Date.now(); // compared with passwordChangedAt in getCurrentUser
       }
       return token;
     },
     session({ session, token }) {
       session.user.id = token.id;
       session.user.role = token.role;
+      session.user.loginAt = token.loginAt ?? 0;
       return session;
     },
   },
@@ -62,10 +64,14 @@ export const getCurrentUser = cache(async () => {
   await connection();
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return null;
-  return prisma.user.findUnique({
+  const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { id: true, name: true, phone: true, email: true, role: true },
+    select: { id: true, name: true, phone: true, email: true, role: true, passwordChangedAt: true },
   });
+  if (!user) return null;
+  // A session from before the latest password change no longer counts (e.g. after a reset).
+  if (user.passwordChangedAt && session.user.loginAt < user.passwordChangedAt.getTime()) return null;
+  return { id: user.id, name: user.name, phone: user.phone, email: user.email, role: user.role };
 });
 
 export type CurrentUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;

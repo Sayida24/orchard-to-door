@@ -54,18 +54,39 @@ enum ComplaintResolution {
 }
 
 model User {
-  id            String         @id @default(cuid())
-  name          String
-  phone         String         @unique
-  email         String?        @unique
-  passwordHash  String
-  role          Role           @default(CUSTOMER)
-  createdAt     DateTime       @default(now())
-  orchards      Orchard[]      @relation("SellerOrchards")
-  batches       Batch[]        @relation("SellerBatches")
-  orders        Order[]        @relation("CustomerOrders")
-  complaints    Complaint[]
-  notifications Notification[]
+  id                  String               @id @default(cuid())
+  name                String
+  phone               String               @unique
+  email               String?              @unique
+  passwordHash        String
+  role                Role                 @default(CUSTOMER)
+  createdAt           DateTime             @default(now())
+  // Set on every password change; sessions issued before it are logged out
+  passwordChangedAt   DateTime?
+  orchards            Orchard[]            @relation("SellerOrchards")
+  batches             Batch[]              @relation("SellerBatches")
+  orders              Order[]              @relation("CustomerOrders")
+  complaints          Complaint[]
+  notifications       Notification[]
+  passwordResetTokens PasswordResetToken[] @relation("ResetTokenUser")
+  createdResetTokens  PasswordResetToken[] @relation("ResetTokenCreator")
+}
+
+// One-time password reset link. Only a SHA-256 hash of the token is stored,
+// so a database leak can't be used to reset passwords.
+model PasswordResetToken {
+  id          String    @id @default(cuid())
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+  userId      String
+  user        User      @relation("ResetTokenUser", fields: [userId], references: [id], onDelete: Cascade)
+  // Set when an admin created the link; null for self-service email reset
+  createdById String?
+  createdBy   User?     @relation("ResetTokenCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
 }
 
 model Orchard {
@@ -188,4 +209,3 @@ model Notification {
   userId    String
   user      User     @relation(fields: [userId], references: [id])
 }
-
