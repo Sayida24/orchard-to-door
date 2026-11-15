@@ -30,6 +30,7 @@ export function RegisterForm() {
 
   const errors = state && !state.ok ? state.errors : undefined;
   const message = state && !state.ok ? state.message : undefined;
+  const v = state && !state.ok ? state.values : undefined; // typed values after an error
 
   return (
     <form action={formAction} className="space-y-4" noValidate>
@@ -37,7 +38,7 @@ export function RegisterForm() {
         <label htmlFor="name" className={ui.label}>
           Full name
         </label>
-        <input id="name" name="name" required autoComplete="name" className={ui.input} />
+        <input id="name" name="name" required autoComplete="name" defaultValue={v?.name} className={ui.input} />
         {errors?.name && <p className={ui.fieldError}>{errors.name}</p>}
       </div>
       <div>
@@ -52,6 +53,7 @@ export function RegisterForm() {
           required
           autoComplete="tel"
           placeholder="01XXXXXXXXX"
+          defaultValue={v?.phone}
           className={ui.input}
         />
         {errors?.phone && <p className={ui.fieldError}>{errors.phone}</p>}
@@ -60,7 +62,7 @@ export function RegisterForm() {
         <label htmlFor="email" className={ui.label}>
           Email <span className="font-normal text-stone-500">(optional)</span>
         </label>
-        <input id="email" name="email" type="email" autoComplete="email" className={ui.input} />
+        <input id="email" name="email" type="email" autoComplete="email" defaultValue={v?.email} className={ui.input} />
         {errors?.email && <p className={ui.fieldError}>{errors.email}</p>}
       </div>
       <div>

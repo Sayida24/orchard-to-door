@@ -7,7 +7,7 @@ import { BD_PHONE, EMAIL, MIN_PASSWORD, normalizePhone } from "@/lib/validation"
 type Field = "name" | "phone" | "email" | "password";
 
 export type RegisterState =
-  | { ok?: false; errors?: Partial<Record<Field, string>>; message?: string }
+  | { ok?: false; errors?: Partial<Record<Field, string>>; message?: string; values?: Record<string, string> }
   | { ok: true; phone: string }
   | undefined;
 
@@ -19,12 +19,15 @@ export async function register(_prev: RegisterState, formData: FormData): Promis
   const email = emailRaw || null;
   const password = String(formData.get("password") ?? "");
 
+  // Echo typed values (not the password): React 19 resets the form after each action.
+  const values = { name, phone: String(formData.get("phone") ?? ""), email: emailRaw };
+
   const errors: Partial<Record<Field, string>> = {};
   if (name.length < 2) errors.name = "Enter your name.";
   if (!BD_PHONE.test(phone)) errors.phone = "Enter an 11-digit mobile number, e.g. 01712345678.";
   if (email && !EMAIL.test(email)) errors.email = "Enter a valid email or leave it empty.";
   if (password.length < MIN_PASSWORD) errors.password = `Use at least ${MIN_PASSWORD} characters.`;
-  if (Object.keys(errors).length) return { errors };
+  if (Object.keys(errors).length) return { errors, values };
 
   const existing = await prisma.user.findFirst({
     where: { OR: [{ phone }, ...(email ? [{ email }] : [])] },
@@ -32,8 +35,8 @@ export async function register(_prev: RegisterState, formData: FormData): Promis
   });
   if (existing) {
     return existing.phone === phone
-      ? { errors: { phone: "This phone number already has an account." } }
-      : { errors: { email: "This email already has an account." } };
+      ? { errors: { phone: "This phone number already has an account." }, values }
+      : { errors: { email: "This email already has an account." }, values };
   }
 
   await prisma.user.create({

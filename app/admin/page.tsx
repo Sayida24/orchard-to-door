@@ -1,44 +1,47 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { requireUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { ui } from "@/lib/ui";
-
-const sections = [
-  { href: "/admin/users", title: "Users and roles", note: "Make customers sellers or admins", ready: true },
-  { href: "#", title: "Orchards", note: "Coming next", ready: false },
-  { href: "#", title: "Varieties and Mango Guide", note: "Coming next", ready: false },
-  { href: "#", title: "Delivery areas", note: "Coming soon", ready: false },
-  { href: "#", title: "Orders and complaints", note: "Coming soon", ready: false },
-];
 
 export default function AdminHome() {
   return (
-    <main className={ui.page}>
-      <h1 className="mb-4 text-2xl font-bold">Admin</h1>
+    <main>
+      <h1 className="mb-4 text-2xl font-bold">Overview</h1>
       <Suspense fallback={<p className="text-stone-500">Loading…</p>}>
-        <AdminSections />
+        <Overview />
       </Suspense>
     </main>
   );
 }
 
-async function AdminSections() {
+async function Overview() {
   await requireUser(["ADMIN"]);
+  const [users, sellers, orchards, varieties, areas, openBatches] = await Promise.all([
+    prisma.user.count(),
+    prisma.user.count({ where: { role: "SELLER" } }),
+    prisma.orchard.count(),
+    prisma.variety.count(),
+    prisma.deliveryArea.count({ where: { isActive: true } }),
+    prisma.batch.count({ where: { status: "OPEN" } }),
+  ]);
+
+  const cards = [
+    { href: "/admin/users", title: "Users", value: users, note: `${sellers} seller${sellers === 1 ? "" : "s"}` },
+    { href: "/admin/orchards", title: "Orchards", value: orchards, note: `${openBatches} open batches` },
+    { href: "/admin/varieties", title: "Varieties", value: varieties, note: "Mango Guide" },
+    { href: "/admin/delivery-areas", title: "Delivery areas", value: areas, note: "active" },
+  ];
+
   return (
-    <ul className="grid gap-3 sm:grid-cols-2">
-      {sections.map((s) => (
-        <li key={s.title}>
-          {s.ready ? (
-            <Link href={s.href} className={`${ui.card} block hover:border-amber-400`}>
-              <p className="font-semibold">{s.title}</p>
-              <p className="text-sm text-stone-600">{s.note}</p>
-            </Link>
-          ) : (
-            <div className={`${ui.card} opacity-60`}>
-              <p className="font-semibold">{s.title}</p>
-              <p className="text-sm text-stone-600">{s.note}</p>
-            </div>
-          )}
+    <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {cards.map((c) => (
+        <li key={c.href}>
+          <Link href={c.href} className={`${ui.card} block h-full hover:border-amber-400`}>
+            <p className="text-sm text-stone-600">{c.title}</p>
+            <p className="mt-1 text-3xl font-bold">{c.value}</p>
+            <p className="text-xs text-stone-500">{c.note}</p>
+          </Link>
         </li>
       ))}
     </ul>
