@@ -11,7 +11,8 @@ export type DecideState = { ok?: boolean; error?: string } | undefined;
 const DECISIONS = ["REFUND", "REPLACEMENT", "REJECT"] as const;
 
 // FR-21 / FR-25: the admin approves a refund or replacement, or turns the report down.
-// The customer always hears the outcome; the seller hears about approved ones.
+// The customer always hears the outcome. For approved ones the seller carries it out:
+// they have the customer's address and phone, so they send the new box or return the money.
 export async function decideReport(_prev: DecideState, fd: FormData): Promise<DecideState> {
   await requireUser(["ADMIN"]);
   const id = str(fd, "id");
@@ -28,8 +29,9 @@ export async function decideReport(_prev: DecideState, fd: FormData): Promise<De
   if (!report) return { error: "Report not found." };
 
   const approved = decision !== "REJECT";
-  const what = decision === "REFUND" ? "refund" : "replacement";
+  const refund = decision === "REFUND";
   const num = orderNumber(report.orderId);
+  const problem = report.reason ?? "a problem";
 
   const decided = await prisma.$transaction(async (tx) => {
     // Only an OPEN report can be decided, so two admins can't decide the same one twice.
@@ -47,16 +49,20 @@ export async function decideReport(_prev: DecideState, fd: FormData): Promise<De
     const notes = [
       {
         userId: report.customerId,
-        message: approved
-          ? `Your report on order #${num} was approved: we'll arrange a ${what}.`
-          : `Your report on order #${num} was reviewed and not approved.`,
+        message: !approved
+          ? `Your report on order #${num} was reviewed and not approved.`
+          : refund
+            ? `Your report on order #${num} was approved: the seller will return your money.`
+            : `Your report on order #${num} was approved: the seller will send you a new box.`,
         link: `/customer/orders/${report.orderId}`,
       },
     ];
     if (approved) {
       notes.push({
         userId: report.order.batch.sellerId,
-        message: `Order #${num}: admin approved a ${what} (${report.reason ?? "problem reported"}).`,
+        message: refund
+          ? `Order #${num}: refund approved (${problem}). Please return the money to the customer.`
+          : `Order #${num}: replacement approved (${problem}). Please send the customer a new box.`,
         link: "/seller",
       });
     }
@@ -67,6 +73,7 @@ export async function decideReport(_prev: DecideState, fd: FormData): Promise<De
 
   revalidatePath("/admin");
   revalidatePath("/admin/reports");
+  revalidatePath("/admin/orchards");
   revalidatePath(`/customer/orders/${report.orderId}`);
   return { ok: true };
 }
