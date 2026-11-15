@@ -50,6 +50,8 @@ export function OrderForm({
     <form action={action} className="space-y-7">
       <input type="hidden" name="orchardId" value={orchardId} />
       <input type="hidden" name="batchId" value={batch.id} />
+      {/* The price the customer saw: if the seller changes it meanwhile, the order stops. */}
+      <input type="hidden" name="price" value={batch.pricePerKg} />
       <input type="hidden" name="slot" value={slot} />
 
       <fieldset className="space-y-3">

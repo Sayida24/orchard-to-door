@@ -63,7 +63,7 @@ export async function decideReport(_prev: DecideState, fd: FormData): Promise<De
         message: refund
           ? `Order #${num}: refund approved (${problem}). Please return the money to the customer.`
           : `Order #${num}: replacement approved (${problem}). Please send the customer a new box.`,
-        link: "/seller",
+        link: "/seller/orders",
       });
     }
     await tx.notification.createMany({ data: notes });

@@ -7,7 +7,7 @@ import { Stars } from "@/components/stars";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { dateLabel, orderNumber, taka, timeLabel } from "@/lib/shop";
-import { ReportForm, ReviewForm } from "./feedback-forms";
+import { ConfirmDelivery, ReportForm, ReviewForm } from "./feedback-forms";
 
 const COMPLAINT_STATUS: Record<ComplaintStatus, { label: string; tone: string }> = {
   OPEN: { label: "We're looking into it", tone: "bg-amber-100 text-amber-900" },
@@ -21,7 +21,7 @@ const STEPS: { status: OrderStatus; title: string; note: string }[] = [
   { status: "PLACED", title: "Placed", note: "The seller has been told about your order." },
   { status: "PACKED", title: "Packed and AI-checked", note: "The seller packs and photographs your mangoes. You'll see the AI check here." },
   { status: "DISPATCHED", title: "Dispatched", note: "On its way to you." },
-  { status: "DELIVERED", title: "Delivered", note: "Pay in cash when it arrives." },
+  { status: "DELIVERED", title: "Delivered", note: "Pay in cash when it arrives, then tap “I got my mangoes”." },
 ];
 
 // Order status (FR-19). Only the customer who placed the order can see it.
@@ -109,7 +109,10 @@ async function OrderStatusContent({
       <section className="rounded-2xl border border-stone-200 bg-white p-4" aria-labelledby="status">
         <h2 id="status" className="mb-4 font-bold text-stone-900">Order status</h2>
         {cancelled ? (
-          <p className="rounded-xl bg-red-50 px-3 py-2 font-semibold text-red-800">This order was cancelled.</p>
+          <p className="rounded-xl bg-red-50 px-3 py-2 font-semibold text-red-800">
+            The seller cancelled this order{order.cancelReason ? ` (${order.cancelReason.toLowerCase()})` : ""}. You
+            won&apos;t be charged.
+          </p>
         ) : (
           <ol>
             {STEPS.map((s, i) => {
@@ -145,8 +148,12 @@ async function OrderStatusContent({
         )}
       </section>
 
-      {!cancelled && order.status !== "DELIVERED" && (
-        <p className="rounded-2xl bg-stone-100 px-4 py-3 text-sm text-stone-700">We&apos;ll notify you here when your mangoes are packed.</p>
+      {order.status === "DISPATCHED" && <ConfirmDelivery orderId={order.id} total={taka(order.totalPrice)} />}
+
+      {(order.status === "PLACED" || order.status === "PACKED") && (
+        <p className="rounded-2xl bg-stone-100 px-4 py-3 text-sm text-stone-700">
+          We&apos;ll let you know at each step. Check the bell at the top.
+        </p>
       )}
 
       {!cancelled && (
@@ -186,6 +193,11 @@ async function OrderStatusContent({
                   </div>
                   <p className="text-sm text-stone-700">{c.message}</p>
                   {c.adminNote && <p className="rounded-xl bg-stone-50 px-3 py-2 text-sm text-stone-700">Reply: {c.adminNote}</p>}
+                  {c.status === "APPROVED" && c.completedAt && (
+                    <p className="text-sm font-semibold text-green-800">
+                      {c.resolution === "REFUND" ? "Money returned" : "New box sent"} {dateLabel(c.completedAt)}
+                    </p>
+                  )}
                   <p className="text-xs text-stone-500">Sent {dateLabel(c.createdAt)}</p>
                 </li>
               );

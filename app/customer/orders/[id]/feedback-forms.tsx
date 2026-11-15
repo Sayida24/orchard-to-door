@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { COMPLAINT_REASONS } from "@/lib/shop";
-import { reportProblem, submitReview, type FeedbackState } from "./actions";
+import { confirmDelivery, reportProblem, submitReview, type FeedbackState } from "./actions";
 
 const field =
   "w-full rounded-2xl border border-stone-300 bg-white px-3 text-base text-stone-900 placeholder:text-stone-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200";
@@ -13,6 +13,22 @@ function ErrorNote({ text }: { text?: string }) {
       {text}
     </p>
   ) : null;
+}
+
+// Shown while the order is on its way: the customer confirms it arrived (FR-19).
+export function ConfirmDelivery({ orderId, total }: { orderId: string; total: string }) {
+  const [state, action, pending] = useActionState<FeedbackState, FormData>(confirmDelivery, undefined);
+  return (
+    <form action={action} className="space-y-2 rounded-2xl border-2 border-green-700 bg-green-50 p-4">
+      <input type="hidden" name="orderId" value={orderId} />
+      <p className="font-bold text-green-900">Got your mangoes?</p>
+      <p className="text-sm text-green-900">Pay {total} in cash when the box arrives, then let the seller know.</p>
+      <ErrorNote text={state?.error} />
+      <button type="submit" disabled={pending} className="min-h-12 w-full rounded-2xl bg-green-800 font-bold text-white hover:bg-green-700 disabled:opacity-60">
+        {pending ? "Saving…" : "I got my mangoes"}
+      </button>
+    </form>
+  );
 }
 
 // Report a problem (FR-21). Collapsed until the customer asks for it.

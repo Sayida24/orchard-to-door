@@ -28,6 +28,7 @@ export const config = {
     "/seller/:path*",
     "/account/:path*",
     "/orders/:path*",
+    "/notifications",
     // Browsing orchards is public; ordering and order history need a login.
     "/customer/orchards/:id/order",
     "/customer/orders/:path*",

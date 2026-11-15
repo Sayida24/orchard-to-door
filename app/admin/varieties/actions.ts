@@ -48,7 +48,7 @@ export async function renameVariety(_prev: RenameState, fd: FormData): Promise<R
             message: existing
               ? `An admin merged your variety "${variety.name}" into "${existing.name}".`
               : `An admin renamed your variety "${variety.name}" to "${name}".`,
-            link: "/seller",
+            link: "/seller/batches",
           },
         });
       }

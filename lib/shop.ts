@@ -58,6 +58,25 @@ export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "
 
 export const orderNumber = (id: string) => id.slice(-6).toUpperCase();
 
+/** How long a seller can keep a batch on sale, counted from the harvest day. */
+export const LISTING_DAYS = [2, 3, 5];
+export const DEFAULT_LISTING_DAYS = 3;
+
+/** The customer confirms delivery; if they don't, the seller may after this long. */
+export const CONFIRM_FALLBACK_DAYS = 2;
+
+/** Why a seller cancels an order (only before packing), and whether its kg go back on sale. */
+export const CANCEL_REASONS = [
+  { reason: "Sold out", restock: false },
+  { reason: "Mangoes not good enough to send", restock: false },
+  { reason: "Can't deliver to this area", restock: true },
+  { reason: "Customer asked to cancel", restock: true },
+  { reason: "Something else", restock: true },
+];
+
+/** The last day a batch is on sale (closesAt is midnight after it, Dhaka time). */
+export const lastSaleDay = (closesAt: Date) => dateLabel(new Date(closesAt.getTime() - 1));
+
 /** Choices on the "Report a problem" form (FR-21). */
 export const COMPLAINT_REASONS = [
   "Damaged or bruised",

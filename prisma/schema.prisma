@@ -161,7 +161,9 @@ model Order {
   createdAt      DateTime      @default(now())
   packedAt       DateTime?
   dispatchedAt   DateTime?
-  deliveredAt    DateTime?
+  deliveredAt    DateTime? // set when the customer confirms (or the seller, 2 days after dispatch)
+  cancelledAt    DateTime?
+  cancelReason   String? // the seller can cancel before packing
   customerId     String
   customer       User          @relation("CustomerOrders", fields: [customerId], references: [id])
   batchId        String
@@ -194,19 +196,21 @@ model Box {
 }
 
 model Complaint {
-  id         String               @id @default(cuid())
-  reason     String? // e.g. "Damaged or bruised"
-  message    String
-  photoUrls  String[]
-  status     ComplaintStatus      @default(OPEN)
-  resolution ComplaintResolution?
-  adminNote  String?
-  resolvedAt DateTime?
-  createdAt  DateTime             @default(now())
-  orderId    String
-  order      Order                @relation(fields: [orderId], references: [id])
-  customerId String
-  customer   User                 @relation(fields: [customerId], references: [id])
+  id          String               @id @default(cuid())
+  reason      String? // e.g. "Damaged or bruised"
+  message     String
+  photoUrls   String[]
+  status      ComplaintStatus      @default(OPEN)
+  resolution  ComplaintResolution?
+  adminNote   String?
+  resolvedAt  DateTime?
+  // When the seller finished an approved refund or replacement
+  completedAt DateTime?
+  createdAt   DateTime             @default(now())
+  orderId     String
+  order       Order                @relation(fields: [orderId], references: [id])
+  customerId  String
+  customer    User                 @relation(fields: [customerId], references: [id])
 }
 
 // FR-37: a customer rates a delivered order once (1–5 stars).

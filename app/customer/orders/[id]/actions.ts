@@ -47,6 +47,35 @@ export async function reportProblem(_prev: FeedbackState, fd: FormData): Promise
   return { ok: true };
 }
 
+// FR-19: the customer confirms the box arrived (and they paid the cash). Then they can rate it.
+export async function confirmDelivery(_prev: FeedbackState, fd: FormData): Promise<FeedbackState> {
+  const orderId = String(fd.get("orderId") ?? "");
+  const found = await ownOrder(orderId);
+  if (!found) return { error: "Order not found." };
+  const { user, order } = found;
+  if (order.status !== "DISPATCHED") return { error: "This order isn't on its way yet." };
+
+  const confirmed = await prisma.$transaction(async (tx) => {
+    const updated = await tx.order.updateMany({
+      where: { id: orderId, status: "DISPATCHED" },
+      data: { status: "DELIVERED", deliveredAt: new Date() },
+    });
+    if (updated.count === 0) return false;
+    await tx.notification.create({
+      data: {
+        userId: order.batch.sellerId,
+        message: `${user.name.split(" ")[0]} got order #${orderNumber(orderId)} (${order.quantityKg} kg ${order.batch.variety.name}).`,
+        link: "/seller/orders?show=delivered",
+      },
+    });
+    return true;
+  });
+  if (!confirmed) return { error: "This order was already updated. Refresh the page." };
+  revalidatePath(`/customer/orders/${orderId}`);
+  revalidatePath("/customer/orders");
+  return { ok: true };
+}
+
 // FR-37: one 1–5 star review per delivered order, shown on the orchard's page.
 export async function submitReview(_prev: FeedbackState, fd: FormData): Promise<FeedbackState> {
   const orderId = String(fd.get("orderId") ?? "");
@@ -68,7 +97,7 @@ export async function submitReview(_prev: FeedbackState, fd: FormData): Promise<
       data: {
         userId: order.batch.sellerId,
         message: `New ${rating}★ review for ${order.batch.variety.name} (order #${orderNumber(orderId)})`,
-        link: "/seller",
+        link: "/seller/orders?show=delivered",
       },
     }),
   ]);

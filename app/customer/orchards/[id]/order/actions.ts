@@ -1,9 +1,10 @@
 "use server";
 
+import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { deliverySlots, GIFT_BOX_FEE, openBatchWhere } from "@/lib/shop";
+import { deliverySlots, GIFT_BOX_FEE, openBatchWhere, taka } from "@/lib/shop";
 
 export type PlaceOrderState = { error?: string } | undefined;
 
@@ -23,6 +24,7 @@ export async function placeOrder(_prev: PlaceOrderState, fd: FormData): Promise<
   const address = String(fd.get("address") ?? "").trim().slice(0, 200);
   const landmark = String(fd.get("landmark") ?? "").trim().slice(0, 120);
   const slot = String(fd.get("slot") ?? "");
+  const shownPrice = Number(fd.get("price"));
   const now = new Date();
 
   if (!Number.isInteger(kg) || kg < 1) return { error: "Choose how many kg you want (at least 1 kg)." };
@@ -41,6 +43,12 @@ export async function placeOrder(_prev: PlaceOrderState, fd: FormData): Promise<
           include: { variety: true },
         });
         if (!batch) throw new OrderProblem("These mangoes are no longer on sale. Please choose again.");
+        // Sellers can change prices any time; never charge a price the customer didn't see.
+        if (shownPrice !== batch.pricePerKg) {
+          throw new OrderProblem(
+            `The seller just changed the price of ${batch.variety.name} to ${taka(batch.pricePerKg)} per kg. Check the new total, then place your order.`,
+          );
+        }
 
         // Take the kilos only if they are still there (two customers can't buy the same stock).
         const taken = await tx.batch.updateMany({
@@ -76,7 +84,7 @@ export async function placeOrder(_prev: PlaceOrderState, fd: FormData): Promise<
           data: {
             userId: batch.sellerId,
             message: `New order: ${kg} kg ${batch.variety.name} to ${area.name}, ${slot}`,
-            link: "/seller",
+            link: "/seller/orders",
           },
         });
         return order.id;
@@ -84,7 +92,10 @@ export async function placeOrder(_prev: PlaceOrderState, fd: FormData): Promise<
       { maxWait: 10_000, timeout: 20_000 }, // the database is in Singapore; allow for slow links
     );
   } catch (e) {
-    if (e instanceof OrderProblem) return { error: e.message };
+    if (e instanceof OrderProblem) {
+      refresh(); // reload the page's prices and stock, keeping what the customer typed
+      return { error: e.message };
+    }
     throw e;
   }
 
