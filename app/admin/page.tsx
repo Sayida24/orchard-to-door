@@ -17,16 +17,27 @@ export default function AdminHome() {
 
 async function Overview() {
   await requireUser(["ADMIN"]);
-  const [users, sellers, orchards, varieties, areas, openBatches] = await Promise.all([
+  const [users, sellers, orchards, varieties, areas, openBatches, orders, waiting, openReports] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { role: "SELLER" } }),
     prisma.orchard.count(),
     prisma.variety.count(),
     prisma.deliveryArea.count({ where: { isActive: true } }),
     prisma.batch.count({ where: { status: "OPEN" } }),
+    prisma.order.count(),
+    prisma.order.count({ where: { status: "PLACED" } }),
+    prisma.complaint.count({ where: { status: "OPEN" } }),
   ]);
 
   const cards = [
+    {
+      href: "/admin/reports",
+      title: "Problem reports",
+      value: openReports,
+      note: openReports ? "need a decision" : "all decided",
+      urgent: openReports > 0,
+    },
+    { href: "/admin/orders", title: "Orders", value: orders, note: `${waiting} waiting to be packed` },
     { href: "/admin/users", title: "Users", value: users, note: `${sellers} seller${sellers === 1 ? "" : "s"}` },
     { href: "/admin/orchards", title: "Orchards", value: orchards, note: `${openBatches} open batches` },
     { href: "/admin/varieties", title: "Varieties", value: varieties, note: "Mango Guide" },
@@ -34,10 +45,13 @@ async function Overview() {
   ];
 
   return (
-    <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <ul className="grid grid-cols-2 gap-3 lg:grid-cols-3">
       {cards.map((c) => (
         <li key={c.href}>
-          <Link href={c.href} className={`${ui.card} block h-full hover:border-amber-400`}>
+          <Link
+            href={c.href}
+            className={`${ui.card} block h-full hover:border-amber-400 ${"urgent" in c && c.urgent ? "border-red-300 bg-red-50" : ""}`}
+          >
             <p className="text-sm text-stone-600">{c.title}</p>
             <p className="mt-1 text-3xl font-bold">{c.value}</p>
             <p className="text-xs text-stone-500">{c.note}</p>

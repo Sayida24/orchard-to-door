@@ -37,7 +37,7 @@ async function OrchardList() {
         <li key={o.id}>
           <Link href={`/admin/orchards/${o.id}`} className={`${ui.card} block h-full hover:border-amber-400`}>
             <p className="font-semibold">{o.name}</p>
-            <p className="text-sm text-stone-600">📍 {o.location}</p>
+            <p className="text-sm text-stone-600">{o.location}</p>
             <p className="mt-2 text-xs text-stone-500">
               Seller: {o.seller.name} · {o._count.batches} batch{o._count.batches === 1 ? "" : "es"}
             </p>

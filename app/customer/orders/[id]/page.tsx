@@ -55,6 +55,7 @@ async function OrderStatusContent({
   });
   if (!order || (order.customerId !== user.id && user.role !== "ADMIN")) notFound();
 
+  const isOwner = order.customerId === user.id; // admins can view, but not review or report for the customer
   const justPlaced = sp.placed === "1";
   const cancelled = order.status === "CANCELLED";
   const reached = STEPS.findIndex((s) => s.status === order.status);
@@ -80,9 +81,9 @@ async function OrderStatusContent({
         </section>
       ) : (
         <div>
-          <Link href="/customer/orders" className="inline-flex min-h-11 items-center gap-1 font-semibold text-stone-800 hover:text-amber-700">
+          <Link href={isOwner ? "/customer/orders" : "/admin/orders"} className="inline-flex min-h-11 items-center gap-1 font-semibold text-stone-800 hover:text-amber-700">
             <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
-            My orders
+            {isOwner ? "My orders" : "All orders"}
           </Link>
           <h1 className="text-3xl font-extrabold tracking-tight text-stone-900">Order #{orderNumber(order.id)}</h1>
         </div>
@@ -145,14 +146,14 @@ async function OrderStatusContent({
         )}
       </section>
 
-      {!cancelled && order.status !== "DELIVERED" && (
+      {isOwner && !cancelled && order.status !== "DELIVERED" && (
         <p className="rounded-2xl bg-stone-100 px-4 py-3 text-sm text-stone-700">We&apos;ll notify you here when your mangoes are packed.</p>
       )}
 
-      {!cancelled && (
+      {!cancelled && (isOwner || order.review) && (
         <section className="space-y-3 rounded-2xl border border-stone-200 bg-white p-4" aria-labelledby="review">
           <h2 id="review" className="font-bold text-stone-900">
-            {order.review ? "Your review" : "Rate your mangoes"}
+            {order.review ? (isOwner ? "Your review" : "Customer's review") : "Rate your mangoes"}
           </h2>
           {order.review ? (
             <div className="space-y-1">
@@ -171,7 +172,7 @@ async function OrderStatusContent({
       {order.complaints.length > 0 && (
         <section className="space-y-3" aria-labelledby="reports">
           <h2 id="reports" className="font-bold text-stone-900">
-            Your reports
+            {isOwner ? "Your reports" : "Problem reports"}
           </h2>
           <ul className="space-y-2">
             {order.complaints.map((c) => {
@@ -194,7 +195,12 @@ async function OrderStatusContent({
         </section>
       )}
 
-      {!cancelled && !order.complaints.some((c) => c.status === "OPEN") && <ReportForm orderId={order.id} />}
+      {isOwner && !cancelled && !order.complaints.some((c) => c.status === "OPEN") && <ReportForm orderId={order.id} />}
+      {!isOwner && order.complaints.some((c) => c.status === "OPEN") && (
+        <Link href="/admin/reports" className="flex min-h-12 items-center justify-center rounded-2xl bg-amber-500 font-bold text-stone-900 hover:bg-amber-400">
+          Decide the open report
+        </Link>
+      )}
 
       <div className="grid gap-3">
         <Link href="/customer" className="flex min-h-12 items-center justify-center rounded-2xl bg-stone-900 font-bold text-white hover:bg-stone-800">

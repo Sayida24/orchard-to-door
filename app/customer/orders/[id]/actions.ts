@@ -39,7 +39,7 @@ export async function reportProblem(_prev: FeedbackState, fd: FormData): Promise
       data: admins.map((a) => ({
         userId: a.id,
         message: `Problem reported on order #${orderNumber(orderId)}: ${reason}`,
-        link: "/admin",
+        link: "/admin/reports",
       })),
     }),
   ]);
