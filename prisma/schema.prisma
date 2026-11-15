@@ -71,6 +71,7 @@ model User {
   reviews             Review[]
   passwordResetTokens PasswordResetToken[] @relation("ResetTokenUser")
   createdResetTokens  PasswordResetToken[] @relation("ResetTokenCreator")
+  addedVarieties      Variety[]            @relation("VarietyAddedBy")
 }
 
 // One-time password reset link. Only a SHA-256 hash of the token is stored,
@@ -97,6 +98,8 @@ model Orchard {
   description String?
   videoUrl    String?
   photoUrls   String[]
+  // false = paused by an admin: hidden from customers, no new orders
+  isActive    Boolean        @default(true)
   createdAt   DateTime       @default(now())
   sellerId    String
   seller      User           @relation("SellerOrchards", fields: [sellerId], references: [id])
@@ -106,12 +109,16 @@ model Orchard {
 }
 
 model Variety {
-  id          String  @id @default(cuid())
-  name        String  @unique
+  id          String   @id @default(cuid())
+  name        String   @unique
   seasonStart Int?
   seasonEnd   Int?
   taste       String?
   bestUse     String?
+  createdAt   DateTime @default(now())
+  // Sellers add varieties when listing a batch; null for the sample varieties
+  addedById   String?
+  addedBy     User?    @relation("VarietyAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
   batches     Batch[]
 }
 
