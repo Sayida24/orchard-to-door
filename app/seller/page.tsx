@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import type { OrderStatus } from "@prisma/client";
 import { Stars } from "@/components/stars";
 import { requireUser } from "@/lib/auth";
+import { expireUnapprovedOrders } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { DAY_MS, dateLabel, openBatchWhere, taka, timeLabel } from "@/lib/shop";
 import { ui } from "@/lib/ui";
@@ -23,6 +24,7 @@ export default function SellerHome() {
 async function Overview() {
   const user = await requireUser(["SELLER"]);
   await connection();
+  await expireUnapprovedOrders();
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * DAY_MS);
   const mine = { batch: { sellerId: user.id } };
@@ -50,7 +52,14 @@ async function Overview() {
   const paused = orchards.filter((o) => !o.isActive);
 
   const cards = [
-    { href: "/seller/orders", title: "To pack", value: count("PLACED"), note: "new orders", alert: count("PLACED") > 0 },
+    {
+      href: "/seller/orders",
+      title: "To approve",
+      value: count("PLACED"),
+      note: "within 24 hours",
+      alert: count("PLACED") > 0,
+    },
+    { href: "/seller/orders?show=approved", title: "To pack", value: count("APPROVED"), note: "approved orders", alert: false },
     { href: "/seller/orders?show=packed", title: "To dispatch", value: count("PACKED"), note: "packed, not sent", alert: false },
     { href: "/seller/orders?show=dispatched", title: "On the way", value: count("DISPATCHED"), note: "with customers soon", alert: false },
     {
@@ -70,9 +79,15 @@ async function Overview() {
       </div>
 
       {orchards.length === 0 && (
-        <p className={`${ui.card} text-stone-700`}>
-          An admin hasn&apos;t set up your orchard yet. Once they do, you can list harvest batches here.
-        </p>
+        <div className={`${ui.card} space-y-3`}>
+          <p className="font-semibold">Welcome! Start by creating your orchard profile.</p>
+          <p className="text-sm text-stone-600">
+            Add your orchard&apos;s name, location and a photo. Then list your harvest batches and customers can order.
+          </p>
+          <Link href="/seller/orchards/new" className={ui.button}>
+            Create your orchard
+          </Link>
+        </div>
       )}
       {paused.map((o) => (
         <p key={o.id} role="status" className="rounded-2xl border border-stone-400 bg-stone-100 px-4 py-3 text-sm font-semibold text-stone-800">
@@ -80,7 +95,7 @@ async function Overview() {
         </p>
       ))}
 
-      <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <ul className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         {cards.map((c) => (
           <li key={c.title}>
             <Link

@@ -4,12 +4,14 @@ import { revalidatePath } from "next/cache";
 import type { OrderStatus, Prisma } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
 import { str } from "@/lib/form";
+import { cancelOrder as cancelHeldOrder } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { CANCEL_REASONS, CONFIRM_FALLBACK_DAYS, DAY_MS, orderNumber, taka } from "@/lib/shop";
 
 function revalidateOrder(orderId: string) {
   revalidatePath("/seller");
   revalidatePath("/seller/orders");
+  revalidatePath("/seller/batches");
   revalidatePath("/customer/orders");
   revalidatePath(`/customer/orders/${orderId}`);
 }
@@ -44,8 +46,19 @@ async function advance(
   if (moved) revalidateOrder(id);
 }
 
+// FR-08: the seller approves a new order within 24 hours. Its kg were already held
+// when the customer ordered, so approving confirms the sale.
+export async function approveOrder(fd: FormData) {
+  await advance(
+    fd,
+    "PLACED",
+    { status: "APPROVED", approvedAt: new Date() },
+    (n) => `The seller approved your order #${n}. They'll pack it soon.`,
+  );
+}
+
 export async function packOrder(fd: FormData) {
-  await advance(fd, "PLACED", { status: "PACKED", packedAt: new Date() }, (n) => `Your order #${n} is packed. It will be on its way soon.`);
+  await advance(fd, "APPROVED", { status: "PACKED", packedAt: new Date() }, (n) => `Your order #${n} is packed. It will be on its way soon.`);
 }
 
 export async function dispatchOrder(fd: FormData) {
@@ -70,48 +83,24 @@ export async function markDelivered(fd: FormData) {
   );
 }
 
-// Before packing, the seller can cancel. The customer is told why, and unless the
-// mangoes are gone or not good enough, the kg go back on sale.
+// Decline a new order, or cancel an approved one before packing. The customer is told
+// why; unless the mangoes are gone or not good enough, the held kg go back on sale.
 export async function cancelOrder(fd: FormData) {
   const user = await requireUser(["SELLER"]);
   const id = str(fd, "orderId");
   const choice = CANCEL_REASONS.find((c) => c.reason === str(fd, "reason"));
   if (!choice) return;
-  const now = new Date();
 
-  const batch = await prisma.$transaction(async (tx) => {
-    const order = await tx.order.findFirst({
-      where: { id, status: "PLACED", batch: { sellerId: user.id } },
-      select: { customerId: true, quantityKg: true, batch: { select: { id: true, orchardId: true, status: true, closesAt: true } } },
-    });
-    if (!order) return null;
-    const updated = await tx.order.updateMany({
-      where: { id, status: "PLACED" },
-      data: { status: "CANCELLED", cancelledAt: now, cancelReason: choice.reason },
-    });
-    if (updated.count === 0) return null;
-
-    if (choice.restock) {
-      const b = order.batch;
-      const reopen = b.status === "SOLD_OUT" && (b.closesAt === null || b.closesAt > now);
-      await tx.batch.update({
-        where: { id: b.id },
-        data: { availableKg: { increment: order.quantityKg }, ...(reopen ? { status: "OPEN" as const } : {}) },
-      });
-    }
-    await tx.notification.create({
-      data: {
-        userId: order.customerId,
-        message: `Sorry, order #${orderNumber(id)} was cancelled by the seller (${choice.reason.toLowerCase()}). You won't be charged.`,
-        link: `/customer/orders/${id}`,
-      },
-    });
-    return order.batch;
+  const batch = await cancelHeldOrder({
+    orderId: id,
+    from: ["PLACED", "APPROVED"],
+    reason: choice.reason,
+    restock: choice.restock,
+    by: "seller",
+    where: { batch: { sellerId: user.id } },
   });
   if (!batch) return;
-
   revalidateOrder(id);
-  revalidatePath("/seller/batches");
   revalidatePath(`/seller/batches/${batch.id}`);
   revalidatePath("/customer");
   revalidatePath(`/customer/orchards/${batch.orchardId}`);

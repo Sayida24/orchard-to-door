@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
+import { Photo } from "@/components/photo";
 import { SubmitButton } from "@/components/submit-button";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -25,12 +26,10 @@ async function OrchardAdmin({ params }: { params: Promise<{ id: string }> }) {
   await requireUser(["ADMIN"]);
   await connection();
   const { id } = await params;
-  const [orchard, sellers, quality] = await Promise.all([
-    prisma.orchard.findUnique({ where: { id }, include: { _count: { select: { batches: true } } } }),
-    prisma.user.findMany({
-      where: { role: "SELLER" },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true, phone: true },
+  const [orchard, quality] = await Promise.all([
+    prisma.orchard.findUnique({
+      where: { id },
+      include: { seller: { select: { name: true, phone: true } }, _count: { select: { batches: true } } },
     }),
     orchardQuality(new Date(), id),
   ]);
@@ -47,10 +46,22 @@ async function OrchardAdmin({ params }: { params: Promise<{ id: string }> }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-2xl font-bold">{orchard.name}</h1>
-        {!orchard.isActive && <span className="rounded-full bg-stone-800 px-2.5 py-0.5 text-xs font-bold text-white">Paused</span>}
-        {q.flagged && <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-bold text-red-800">Needs attention</span>}
+      <div className="h-44 overflow-hidden rounded-2xl bg-stone-200">
+        {orchard.photoUrls[0] ? (
+          <Photo src={orchard.photoUrls[0]} alt={`${orchard.name} photo`} className="h-full w-full object-cover" />
+        ) : (
+          <p className="flex h-full items-center justify-center text-sm text-stone-600">No photo</p>
+        )}
+      </div>
+      <div>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-2xl font-bold">{orchard.name}</h1>
+          {!orchard.isActive && <span className="rounded-full bg-stone-800 px-2.5 py-0.5 text-xs font-bold text-white">Paused</span>}
+          {q.flagged && <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-bold text-red-800">Needs attention</span>}
+        </div>
+        <p className="text-sm text-stone-600">
+          {orchard.location} · run by {orchard.seller.name} ({orchard.seller.phone})
+        </p>
       </div>
 
       <section className={`${ui.card} space-y-3`} aria-labelledby="quality">
@@ -110,9 +121,9 @@ async function OrchardAdmin({ params }: { params: Promise<{ id: string }> }) {
 
       <section className="space-y-3" aria-labelledby="details">
         <h2 id="details" className="font-semibold">
-          Details
+          Fix details
         </h2>
-        <OrchardForm orchard={orchard} sellers={sellers} />
+        <OrchardForm orchard={orchard} />
       </section>
 
       <form action={deleteOrchard} className={`${ui.card} border-red-200`}>

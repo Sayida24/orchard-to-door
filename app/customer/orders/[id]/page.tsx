@@ -5,9 +5,10 @@ import { Suspense } from "react";
 import type { ComplaintStatus, OrderStatus } from "@prisma/client";
 import { Stars } from "@/components/stars";
 import { requireUser } from "@/lib/auth";
+import { APPROVAL_HOURS, approvalHoursLeft, CUSTOMER_CANCELLED, expireUnapprovedOrders, NOT_APPROVED_IN_TIME } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { dateLabel, orderNumber, taka, timeLabel } from "@/lib/shop";
-import { ConfirmDelivery, ReportForm, ReviewForm } from "./feedback-forms";
+import { CancelMyOrder, ConfirmDelivery, ReportForm, ReviewForm } from "./feedback-forms";
 
 const COMPLAINT_STATUS: Record<ComplaintStatus, { label: string; tone: string }> = {
   OPEN: { label: "We're looking into it", tone: "bg-amber-100 text-amber-900" },
@@ -19,6 +20,7 @@ export const metadata: Metadata = { title: "Your order · Orchiva" };
 
 const STEPS: { status: OrderStatus; title: string; note: string }[] = [
   { status: "PLACED", title: "Placed", note: "The seller has been told about your order." },
+  { status: "APPROVED", title: "Approved by the seller", note: `The seller approves it within ${APPROVAL_HOURS} hours. Your kg are held for you.` },
   { status: "PACKED", title: "Packed and AI-checked", note: "The seller packs and photographs your mangoes. You'll see the AI check here." },
   { status: "DISPATCHED", title: "Dispatched", note: "On its way to you." },
   { status: "DELIVERED", title: "Delivered", note: "Pay in cash when it arrives, then tap “I got my mangoes”." },
@@ -44,6 +46,8 @@ async function OrderStatusContent({
 }) {
   const user = await requireUser();
   const [{ id }, sp] = await Promise.all([params, searchParams]);
+  await expireUnapprovedOrders(); // the 24-hour approval rule
+  const now = new Date();
   const order = await prisma.order.findUnique({
     where: { id },
     include: {
@@ -60,11 +64,18 @@ async function OrderStatusContent({
   const reached = STEPS.findIndex((s) => s.status === order.status);
   const stamp: Partial<Record<OrderStatus, Date | null>> = {
     PLACED: order.createdAt,
+    APPROVED: order.approvedAt,
     PACKED: order.packedAt,
     DISPATCHED: order.dispatchedAt,
     DELIVERED: order.deliveredAt,
   };
   const fruit = order.quantityKg * order.pricePerKg;
+  const cancelText =
+    order.cancelReason === CUSTOMER_CANCELLED
+      ? "You cancelled this order."
+      : order.cancelReason === NOT_APPROVED_IN_TIME
+        ? `This order was cancelled because the seller didn't approve it within ${APPROVAL_HOURS} hours. You won't be charged.`
+        : `The seller cancelled this order${order.cancelReason ? ` (${order.cancelReason.toLowerCase()})` : ""}. You won't be charged.`;
 
   return (
     <div className="space-y-5">
@@ -76,6 +87,9 @@ async function OrderStatusContent({
           <h1 className="text-3xl font-extrabold tracking-tight text-stone-900">Order placed</h1>
           <p className="text-stone-600">
             Order #{orderNumber(order.id)} · {taka(order.totalPrice)}, cash on delivery
+          </p>
+          <p className="text-sm text-stone-600">
+            The seller will approve it within {APPROVAL_HOURS} hours. We&apos;ll let you know.
           </p>
         </section>
       ) : (
@@ -109,10 +123,7 @@ async function OrderStatusContent({
       <section className="rounded-2xl border border-stone-200 bg-white p-4" aria-labelledby="status">
         <h2 id="status" className="mb-4 font-bold text-stone-900">Order status</h2>
         {cancelled ? (
-          <p className="rounded-xl bg-red-50 px-3 py-2 font-semibold text-red-800">
-            The seller cancelled this order{order.cancelReason ? ` (${order.cancelReason.toLowerCase()})` : ""}. You
-            won&apos;t be charged.
-          </p>
+          <p className="rounded-xl bg-red-50 px-3 py-2 font-semibold text-red-800">{cancelText}</p>
         ) : (
           <ol>
             {STEPS.map((s, i) => {
@@ -150,7 +161,20 @@ async function OrderStatusContent({
 
       {order.status === "DISPATCHED" && <ConfirmDelivery orderId={order.id} total={taka(order.totalPrice)} />}
 
-      {(order.status === "PLACED" || order.status === "PACKED") && (
+      {order.status === "PLACED" && (
+        <section className="space-y-2 rounded-2xl border border-amber-300 bg-amber-50 p-4" aria-labelledby="waiting">
+          <h2 id="waiting" className="font-bold text-amber-950">
+            Waiting for the seller to approve
+          </h2>
+          <p className="text-sm text-amber-950">
+            Your {order.quantityKg} kg are held for you. The seller has {approvalHoursLeft(order.createdAt, now)} more
+            hours to approve; if they don&apos;t, the order is cancelled and you won&apos;t be charged.
+          </p>
+          <CancelMyOrder orderId={order.id} />
+        </section>
+      )}
+
+      {(order.status === "APPROVED" || order.status === "PACKED") && (
         <p className="rounded-2xl bg-stone-100 px-4 py-3 text-sm text-stone-700">
           We&apos;ll let you know at each step. Check the bell at the top.
         </p>

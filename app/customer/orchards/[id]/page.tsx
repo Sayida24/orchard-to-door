@@ -5,6 +5,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { Photo } from "@/components/photo";
 import { Stars } from "@/components/stars";
+import { expireUnapprovedOrders } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { DAY_MS, dateLabel, dayLabel, dhakaDayStart, durationLabel, MONTHS, openBatchWhere, taka, timeLabel } from "@/lib/shop";
 import { HarvestVideos, type VideoItem } from "./harvest-videos";
@@ -34,6 +35,7 @@ export default function OrchardPage({ params }: PageProps<"/customer/orchards/[i
 async function OrchardDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   await connection(); // "today's videos" depends on the request time, so never prerender this part
+  await expireUnapprovedOrders(); // kg held by orders nobody approved in 24 hours go back on sale
   const now = new Date();
   const today = dhakaDayStart(now);
   const weekAgo = new Date(today.getTime() - 6 * DAY_MS);

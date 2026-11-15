@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
+import { cancelOrder, CUSTOMER_CANCELLED } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { COMPLAINT_REASONS, orderNumber } from "@/lib/shop";
 
@@ -44,6 +45,27 @@ export async function reportProblem(_prev: FeedbackState, fd: FormData): Promise
     }),
   ]);
   revalidatePath(`/customer/orders/${orderId}`);
+  return { ok: true };
+}
+
+// While the seller hasn't approved it yet, the customer can cancel; the held kg go back on sale.
+export async function cancelMyOrder(_prev: FeedbackState, fd: FormData): Promise<FeedbackState> {
+  const user = await requireUser();
+  const orderId = String(fd.get("orderId") ?? "");
+  const batch = await cancelOrder({
+    orderId,
+    from: ["PLACED"],
+    reason: CUSTOMER_CANCELLED,
+    restock: true,
+    by: "customer",
+    where: { customerId: user.id },
+  });
+  if (!batch) return { error: "The seller has already approved this order, so it can't be cancelled here." };
+  revalidatePath(`/customer/orders/${orderId}`);
+  revalidatePath("/customer/orders");
+  revalidatePath("/customer");
+  revalidatePath(`/customer/orchards/${batch.orchardId}`);
+  revalidatePath("/seller/orders");
   return { ok: true };
 }
 
