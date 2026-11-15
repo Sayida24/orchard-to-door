@@ -3,18 +3,17 @@ import { Suspense } from "react";
 import { requireUser } from "@/lib/auth";
 import { MONTHS } from "@/lib/form";
 import { prisma } from "@/lib/prisma";
+import { dateLabel } from "@/lib/shop";
 import { ui } from "@/lib/ui";
 
 export default function VarietiesPage() {
   return (
     <main>
-      <div className="mb-1 flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">Varieties</h1>
-        <Link href="/admin/varieties/new" className={`${ui.button} px-4 py-2 text-sm`}>
-          + New variety
-        </Link>
-      </div>
-      <p className="mb-4 text-sm text-stone-600">These entries make up the customer-facing Mango Guide.</p>
+      <h1 className="mb-1 text-2xl font-bold">Varieties</h1>
+      <p className="mb-4 text-sm text-stone-600">
+        Sellers add varieties when they list a batch, and customers see them in the Mango Guide. You can correct a
+        variety&apos;s name.
+      </p>
       <Suspense fallback={<p className="text-stone-500">Loading varieties…</p>}>
         <VarietyList />
       </Suspense>
@@ -27,12 +26,12 @@ const short = (m: number) => MONTHS[m - 1].slice(0, 3);
 async function VarietyList() {
   await requireUser(["ADMIN"]);
   const varieties = await prisma.variety.findMany({
-    orderBy: [{ seasonStart: "asc" }, { name: "asc" }],
-    include: { _count: { select: { batches: true } } },
+    orderBy: { name: "asc" },
+    include: { addedBy: { select: { name: true } }, _count: { select: { batches: true } } },
   });
 
   if (varieties.length === 0) {
-    return <p className={`${ui.card} text-stone-600`}>No varieties yet. Add the first one.</p>;
+    return <p className={`${ui.card} text-stone-600`}>No varieties yet. They appear here when sellers add them.</p>;
   }
 
   return (
@@ -50,7 +49,7 @@ async function VarietyList() {
             </div>
             {v.taste && <p className="mt-1 text-sm text-stone-600">{v.taste}</p>}
             <p className="mt-2 text-xs text-stone-500">
-              {v.bestUse ? `Best for: ${v.bestUse} · ` : ""}
+              {v.addedBy ? `Added by ${v.addedBy.name}, ${dateLabel(v.createdAt)}` : "Sample data"} · used in{" "}
               {v._count.batches} batch{v._count.batches === 1 ? "" : "es"}
             </p>
           </Link>

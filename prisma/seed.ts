@@ -53,21 +53,22 @@ async function main() {
 
   // ---------- Delivery areas (Dhaka first) ----------
   const areas = [
-    { name: "Dhanmondi", fee: 60 },
-    { name: "Gulshan", fee: 60 },
-    { name: "Mirpur", fee: 60 },
-    { name: "Uttara", fee: 80 },
-    { name: "Mohammadpur", fee: 60 },
-    { name: "Old Dhaka", fee: 80 },
+    { name: "Badda", fee: 60 }, { name: "Banani", fee: 60 }, { name: "Baridhara", fee: 60 },
+    { name: "Bashundhara R/A", fee: 80 }, { name: "Cantonment", fee: 80 }, { name: "Dhanmondi", fee: 60 },
+    { name: "Gulshan", fee: 60 }, { name: "Jatrabari", fee: 80 }, { name: "Khilgaon", fee: 60 },
+    { name: "Khilkhet", fee: 80 }, { name: "Lalbagh", fee: 80 }, { name: "Malibagh", fee: 60 },
+    { name: "Mirpur", fee: 60 }, { name: "Mohakhali", fee: 60 }, { name: "Mohammadpur", fee: 60 },
+    { name: "Motijheel", fee: 60 }, { name: "Old Dhaka", fee: 80 }, { name: "Pallabi", fee: 80 },
+    { name: "Rampura", fee: 60 }, { name: "Shahbagh", fee: 60 }, { name: "Shyamoli", fee: 60 },
+    { name: "Tejgaon", fee: 60 }, { name: "Uttara", fee: 80 }, { name: "Wari", fee: 80 },
   ];
   await Promise.all(
     areas.map((a) => prisma.deliveryArea.upsert({ where: { name: a.name }, update: { fee: a.fee }, create: a })),
   );
 
   // ---------- Orchards + batches ----------
-  if ((await prisma.orchard.count()) === 0) {
-    const now = Date.now();
-    const orchardData = [
+  const now = Date.now();
+  const orchardData = [
       {
         name: "Shibganj Green Orchard",
         location: "Shibganj, Chapainawabganj",
@@ -93,6 +94,8 @@ async function main() {
         batches: [{ variety: "Amrapali", daysAgo: 1, totalKg: 200, pricePerKg: 140 }],
       },
     ];
+
+  if ((await prisma.orchard.count()) === 0) {
 
     for (const o of orchardData) {
       const orchard = await prisma.orchard.create({
@@ -122,6 +125,68 @@ async function main() {
       }
     }
   }
+
+  // ---------- Orchard photos (only where none are set) ----------
+  const photos: Record<string, string[]> = {
+    "Shibganj Green Orchard": ["/images/himsagar.jpeg", "/images/orchard.png"],
+    "Bagha Riverside Orchard": ["/images/harivanga2.jpeg"],
+    "Satkhira Sunrise Orchard": ["/images/langra.jpeg"],
+  };
+  for (const [name, urls] of Object.entries(photos)) {
+    await prisma.orchard.updateMany({ where: { name, photoUrls: { isEmpty: true } }, data: { photoUrls: urls } });
+  }
+
+  // ---------- Keep the sample batches on sale ----------
+  // Batches close 3 days after harvest, so sample ones go stale. Re-date the
+  // expired ones that nobody has ordered from; real batches are never touched.
+  for (const o of orchardData) {
+    for (const b of o.batches) {
+      const harvestDate = new Date(now - b.daysAgo * DAY);
+      await prisma.batch.updateMany({
+        where: {
+          orchard: { name: o.name },
+          variety: { name: b.variety },
+          closesAt: { lt: new Date(now) },
+          orders: { none: {} },
+        },
+        data: {
+          harvestDate,
+          closesAt: new Date(harvestDate.getTime() + 3 * DAY),
+          availableKg: b.totalKg,
+          status: "OPEN",
+        },
+      });
+    }
+  }
+
+  // ---------- Sample harvest videos ----------
+  // Demo rows (they point at /videos/…) are recreated on every run so that
+  // "uploaded today" stays true on the day you seed. Real uploads are untouched.
+  await prisma.harvestVideo.deleteMany({ where: { url: { startsWith: "/videos/" } } });
+  const orchardIds = Object.fromEntries(
+    (await prisma.orchard.findMany({ select: { id: true, name: true } })).map((o) => [o.name, o.id]),
+  );
+  const HOUR = 60 * 60 * 1000;
+  const demoVideos = [
+    { orchard: "Shibganj Green Orchard", title: "Fresh off the tree", poster: "/images/orchard.png", ago: 2 * HOUR, sec: 48 },
+    { orchard: "Shibganj Green Orchard", title: "Sorted and ready to pack", poster: "/images/amrapali.jpeg", ago: 40 * 60 * 1000, sec: 35 },
+    { orchard: "Shibganj Green Orchard", title: "Morning picking", poster: "/images/himsagar.jpeg", ago: 2 * DAY, sec: 52 },
+    { orchard: "Shibganj Green Orchard", title: "Langra trees in fruit", poster: "/images/langra.jpeg", ago: 4 * DAY, sec: 41 },
+    { orchard: "Bagha Riverside Orchard", title: "Picking Fazli by the river", poster: "/images/harivanga2.jpeg", ago: 1 * HOUR, sec: 57 },
+    { orchard: "Satkhira Sunrise Orchard", title: "Amrapali harvest", poster: "/images/amrapali.jpeg", ago: 1 * DAY, sec: 44 },
+  ];
+  await prisma.harvestVideo.createMany({
+    data: demoVideos
+      .filter((v) => orchardIds[v.orchard])
+      .map((v) => ({
+        orchardId: orchardIds[v.orchard],
+        url: "/videos/orchard.mp4",
+        posterUrl: v.poster,
+        title: v.title,
+        durationSec: v.sec,
+        recordedAt: new Date(now - v.ago),
+      })),
+  });
 
   // ---------- Pre-printed QR labels (not linked to an order yet) ----------
   if ((await prisma.box.count()) === 0) {

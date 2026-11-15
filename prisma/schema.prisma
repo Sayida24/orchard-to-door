@@ -68,8 +68,10 @@ model User {
   orders              Order[]              @relation("CustomerOrders")
   complaints          Complaint[]
   notifications       Notification[]
+  reviews             Review[]
   passwordResetTokens PasswordResetToken[] @relation("ResetTokenUser")
   createdResetTokens  PasswordResetToken[] @relation("ResetTokenCreator")
+  addedVarieties      Variety[]            @relation("VarietyAddedBy")
 }
 
 // One-time password reset link. Only a SHA-256 hash of the token is stored,
@@ -90,55 +92,67 @@ model PasswordResetToken {
 }
 
 model Orchard {
-  id          String   @id @default(cuid())
+  id          String         @id @default(cuid())
   name        String
   location    String
   description String?
   videoUrl    String?
   photoUrls   String[]
-  createdAt   DateTime @default(now())
+  // false = paused by an admin: hidden from customers, no new orders
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
   sellerId    String
-  seller      User     @relation("SellerOrchards", fields: [sellerId], references: [id])
+  seller      User           @relation("SellerOrchards", fields: [sellerId], references: [id])
   batches     Batch[]
+  videos      HarvestVideo[]
+  reviews     Review[]
 }
 
 model Variety {
-  id          String  @id @default(cuid())
-  name        String  @unique
+  id          String   @id @default(cuid())
+  name        String   @unique
   seasonStart Int?
   seasonEnd   Int?
   taste       String?
   bestUse     String?
+  createdAt   DateTime @default(now())
+  // Sellers add varieties when listing a batch; null for the sample varieties
+  addedById   String?
+  addedBy     User?    @relation("VarietyAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
   batches     Batch[]
 }
 
 model Batch {
-  id              String      @id @default(cuid())
+  id              String         @id @default(cuid())
   harvestDate     DateTime
   totalKg         Float
   availableKg     Float
   pricePerKg      Float
   harvestVideoUrl String?
   spinImageUrls   String[]
-  status          BatchStatus @default(OPEN)
+  status          BatchStatus    @default(OPEN)
   closesAt        DateTime?
-  createdAt       DateTime    @default(now())
+  createdAt       DateTime       @default(now())
   orchardId       String
-  orchard         Orchard     @relation(fields: [orchardId], references: [id])
+  orchard         Orchard        @relation(fields: [orchardId], references: [id])
   varietyId       String
-  variety         Variety     @relation(fields: [varietyId], references: [id])
+  variety         Variety        @relation(fields: [varietyId], references: [id])
   sellerId        String
-  seller          User        @relation("SellerBatches", fields: [sellerId], references: [id])
+  seller          User           @relation("SellerBatches", fields: [sellerId], references: [id])
   orders          Order[]
+  videos          HarvestVideo[]
 }
 
 model Order {
   id             String        @id @default(cuid())
-  boxSizeKg      Float
+  quantityKg     Int // any amount the customer wants, in whole kg
+  pricePerKg     Float // the seller's price when the order was placed
   isGiftBox      Boolean       @default(false)
+  giftFee        Float         @default(0)
   totalPrice     Float
   deliveryFee    Float         @default(0)
-  address        String
+  address        String // house, flat and road (the area is deliveryArea)
+  landmark       String?
   deliverySlot   String?
   deliveryAreaId String?
   deliveryArea   DeliveryArea? @relation(fields: [deliveryAreaId], references: [id])
@@ -147,13 +161,16 @@ model Order {
   createdAt      DateTime      @default(now())
   packedAt       DateTime?
   dispatchedAt   DateTime?
-  deliveredAt    DateTime?
+  deliveredAt    DateTime? // set when the customer confirms (or the seller, 2 days after dispatch)
+  cancelledAt    DateTime?
+  cancelReason   String? // the seller can cancel before packing
   customerId     String
   customer       User          @relation("CustomerOrders", fields: [customerId], references: [id])
   batchId        String
   batch          Batch         @relation(fields: [batchId], references: [id])
-  box            Box?
+  boxes          Box[] // a big order is packed in several boxes
   complaints     Complaint[]
+  review         Review?
 }
 
 model Box {
@@ -172,23 +189,63 @@ model Box {
   annotatedPhotoUrls String[]
   aiCheckedAt        DateTime?
   // Optional so QR labels can be pre-printed; the seller scans one at packing (FR-17)
-  orderId            String?   @unique
+  orderId            String?
   order              Order?    @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
 }
 
 model Complaint {
-  id         String               @id @default(cuid())
-  message    String
-  photoUrls  String[]
-  status     ComplaintStatus      @default(OPEN)
-  resolution ComplaintResolution?
-  adminNote  String?
-  resolvedAt DateTime?
-  createdAt  DateTime             @default(now())
-  orderId    String
-  order      Order                @relation(fields: [orderId], references: [id])
+  id          String               @id @default(cuid())
+  reason      String? // e.g. "Damaged or bruised"
+  message     String
+  photoUrls   String[]
+  status      ComplaintStatus      @default(OPEN)
+  resolution  ComplaintResolution?
+  adminNote   String?
+  resolvedAt  DateTime?
+  // When the seller finished an approved refund or replacement
+  completedAt DateTime?
+  createdAt   DateTime             @default(now())
+  orderId     String
+  order       Order                @relation(fields: [orderId], references: [id])
+  customerId  String
+  customer    User                 @relation(fields: [customerId], references: [id])
+}
+
+// FR-37: a customer rates a delivered order once (1–5 stars).
+model Review {
+  id         String   @id @default(cuid())
+  rating     Int // 1 to 5
+  comment    String?
+  createdAt  DateTime @default(now())
+  orderId    String   @unique
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orchardId  String
+  orchard    Orchard  @relation(fields: [orchardId], references: [id], onDelete: Cascade)
   customerId String
-  customer   User                 @relation(fields: [customerId], references: [id])
+  customer   User     @relation(fields: [customerId], references: [id])
+
+  @@index([orchardId, createdAt])
+}
+
+// Harvest videos a seller uploads (FR-05/FR-07). The file lives in storage,
+// compressed; this row is the small record describing it.
+model HarvestVideo {
+  id          String   @id @default(cuid())
+  url         String // compressed video file in storage
+  posterUrl   String? // still image shown before the video loads
+  title       String?
+  durationSec Int?
+  sizeBytes   Int?
+  recordedAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  orchardId   String
+  orchard     Orchard  @relation(fields: [orchardId], references: [id], onDelete: Cascade)
+  batchId     String?
+  batch       Batch?   @relation(fields: [batchId], references: [id], onDelete: SetNull)
+
+  @@index([orchardId, recordedAt])
 }
 
 // Delivery charge by area (FR-10); Dhaka zones first
