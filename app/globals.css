@@ -3,9 +3,24 @@
 @theme inline {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-fraunces), Georgia, serif;
 }
 
-/* Light theme only for now; the brand colours (amber, stone) come from Tailwind. */
+/* "Orchard Morning": a warm white ground, leaf green, and mango accents. */
+@theme {
+  --color-cream: #fbf8f1;
+  --color-ink: #1b2a1f;
+  --color-leaf: #1f4d2b;
+  --color-leaf-dark: #163a20;
+  --color-leaf-soft: #e6efe4;
+  --color-mango: #f4a71d;
+  --color-mango-dark: #e0960f;
+  --color-mango-soft: #fdf0d5;
+  --color-mango-ink: #7a4a00;
+  --color-muted: #5b675d;
+  --color-line: #e9e2d2;
+}
+
 body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }

@@ -33,15 +33,13 @@ export const timeLabel = (d: Date) =>
 export const dateLabel = (d: Date) =>
   d.toLocaleDateString("en-GB", { timeZone: "Asia/Dhaka", weekday: "short", day: "numeric", month: "short" });
 
-/** Delivery times offered at checkout; the server re-checks the choice against this list. */
-export function deliverySlots(now: Date) {
-  const tomorrow = new Date(dhakaDayStart(now).getTime() + DAY_MS);
-  const dayAfter = new Date(tomorrow.getTime() + DAY_MS);
-  return [
-    `${dateLabel(tomorrow)} · 9 AM – 12 PM`,
-    `${dateLabel(tomorrow)} · 3 PM – 6 PM`,
-    `${dateLabel(dayAfter)} · 9 AM – 12 PM`,
-  ];
+/** Delivery is 2 or 3 days after the order: the seller first has up to 24 hours to approve. */
+export const DELIVERY_AFTER_DAYS = [2, 3];
+
+/** The delivery days offered at checkout, e.g. "Wed 18 Nov"; the server re-checks the choice against this list. */
+export function deliveryDays(now: Date) {
+  const today = dhakaDayStart(now).getTime();
+  return DELIVERY_AFTER_DAYS.map((n) => dateLabel(new Date(today + n * DAY_MS)));
 }
 
 export const taka = (n: number) => `৳${Math.round(n).toLocaleString("en-IN")}`;
@@ -76,6 +74,17 @@ export const CANCEL_REASONS = [
 
 /** The last day a batch is on sale (closesAt is midnight after it, Dhaka time). */
 export const lastSaleDay = (closesAt: Date) => dateLabel(new Date(closesAt.getTime() - 1));
+
+/** A colour per mango variety (filter dots, batch badges); others get the mango colour. */
+const VARIETY_COLORS: Record<string, string> = {
+  Himsagar: "#A3BE3C",
+  Langra: "#4F8A3A",
+  Fazli: "#E3B92B",
+  Amrapali: "#EE8A1F",
+  Gopalbhog: "#D9A21B",
+  Harivanga: "#C9A227",
+};
+export const varietyColor = (name: string) => VARIETY_COLORS[name] ?? "#F4A71D";
 
 /** Choices on the "Report a problem" form (FR-21). */
 export const COMPLAINT_REASONS = [

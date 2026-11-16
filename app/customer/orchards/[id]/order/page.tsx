@@ -3,17 +3,17 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { requireUser } from "@/lib/auth";
-import { expireUnapprovedOrders } from "@/lib/orders";
+import { APPROVAL_HOURS, expireUnapprovedOrders } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
-import { dayLabel, deliverySlots, GIFT_BOX_FEE, openBatchWhere } from "@/lib/shop";
+import { dayLabel, deliveryDays, GIFT_BOX_FEE, openBatchWhere } from "@/lib/shop";
 import { OrderForm } from "./order-form";
 
 export const metadata: Metadata = { title: "Order · Orchiva" };
 
 export default function OrderPage({ params }: PageProps<"/customer/orchards/[id]/order">) {
   return (
-    <main className="mx-auto w-full max-w-xl px-4 pb-12 pt-3">
-      <Suspense fallback={<div className="mt-3 h-96 animate-pulse rounded-3xl bg-stone-200" aria-label="Loading order form" />}>
+    <main className="mx-auto w-full max-w-xl px-4 pt-3">
+      <Suspense fallback={<div className="mt-3 h-96 animate-pulse rounded-3xl bg-line" aria-label="Loading order form" />}>
         <OrderContent params={params} />
       </Suspense>
     </main>
@@ -32,6 +32,7 @@ async function OrderContent({ params }: { params: Promise<{ id: string }> }) {
       select: {
         id: true,
         name: true,
+        seller: { select: { name: true } },
         batches: {
           where: openBatchWhere(now),
           orderBy: { harvestDate: "desc" },
@@ -44,10 +45,15 @@ async function OrderContent({ params }: { params: Promise<{ id: string }> }) {
   if (!orchard) notFound();
 
   const back = (
-    <Link href={`/customer/orchards/${orchard.id}`} className="inline-flex min-h-11 items-center gap-1 font-semibold text-stone-800 hover:text-amber-700">
-      <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="m15 18-6-6 6-6" />
-      </svg>
+    <Link
+      href={`/customer/orchards/${orchard.id}`}
+      className="inline-flex min-h-11 items-center gap-2.5 text-sm font-semibold text-ink hover:text-leaf"
+    >
+      <span className="flex h-11 w-11 items-center justify-center rounded-full border border-line bg-white">
+        <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="m15 18-6-6 6-6" />
+        </svg>
+      </span>
       {orchard.name}
     </Link>
   );
@@ -65,9 +71,9 @@ async function OrderContent({ params }: { params: Promise<{ id: string }> }) {
 
   if (batches.length === 0 || areas.length === 0) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 pb-12">
         {back}
-        <p className="rounded-2xl border border-dashed border-stone-300 p-6 text-stone-700">
+        <p className="rounded-3xl border border-dashed border-[#D6CEBC] bg-white/60 p-6 text-muted">
           {batches.length === 0
             ? "Nothing from this orchard is on sale right now. Check back after the next harvest."
             : "Delivery isn't available yet. Please try again later."}
@@ -78,18 +84,22 @@ async function OrderContent({ params }: { params: Promise<{ id: string }> }) {
 
   return (
     <div className="space-y-5">
-      {back}
-      <div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-stone-900">Your order</h1>
-        <p className="text-stone-600">Straight from {orchard.name}, packed for you after you order.</p>
+      <div className="space-y-3">
+        {back}
+        <div className="px-1">
+          <h1 className="font-display text-[32px] font-semibold tracking-tight text-ink">Your order</h1>
+          <p className="text-muted">Straight from {orchard.name}, packed for you after the seller approves.</p>
+        </div>
       </div>
       <OrderForm
         orchardId={orchard.id}
+        sellerFirst={orchard.seller.name.split(" ")[0]}
         batches={batches}
         areas={areas}
-        slots={deliverySlots(now)}
+        days={deliveryDays(now)}
         contact={{ name: user.name, phone: user.phone }}
         giftFee={GIFT_BOX_FEE}
+        approvalHours={APPROVAL_HOURS}
       />
     </div>
   );

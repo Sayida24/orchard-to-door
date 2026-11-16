@@ -187,7 +187,7 @@ function OrderCard({ o, now }: { o: Row; now: Date }) {
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-stone-500">Delivery time</dt>
+          <dt className="text-xs text-stone-500">Deliver on</dt>
           <dd className="text-stone-800">{o.deliverySlot ?? "Any time"}</dd>
         </div>
         <div>
