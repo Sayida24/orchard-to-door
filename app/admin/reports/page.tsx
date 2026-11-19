@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import type { Prisma } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
+import { parseStoredAi, summaryLine } from "@/lib/inspection";
 import { prisma } from "@/lib/prisma";
 import { NO_QUALITY_DATA, orchardQuality } from "@/lib/quality";
 import { dateLabel, orderNumber, taka, timeLabel } from "@/lib/shop";
@@ -57,6 +58,7 @@ async function Reports({ searchParams }: { searchParams: Promise<Record<string, 
             isGiftBox: true,
             status: true,
             deliveredAt: true,
+            boxes: { where: { aiCheckedAt: { not: null } }, orderBy: { aiCheckedAt: "desc" }, take: 1, select: { aiDetections: true } },
             batch: {
               select: {
                 variety: { select: { name: true } },
@@ -118,6 +120,7 @@ async function Reports({ searchParams }: { searchParams: Promise<Record<string, 
             const o = r.order;
             const orchard = o.batch.orchard;
             const q = quality.get(orchard.id) ?? NO_QUALITY_DATA;
+            const ai = parseStoredAi(o.boxes[0]?.aiDetections);
             return (
               <li key={r.id} className={`${ui.card} space-y-3`}>
                 <div className="flex flex-wrap items-start justify-between gap-2">
@@ -171,6 +174,21 @@ async function Reports({ searchParams }: { searchParams: Promise<Record<string, 
                       {q.approved} approved, {q.rejected} not approved
                       {q.flagged && (
                         <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-800">Needs attention</span>
+                      )}
+                    </dd>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <dt className="text-xs text-stone-500">AI check at packing</dt>
+                    <dd className="text-stone-800">
+                      {ai ? (
+                        <>
+                          {summaryLine(ai.summary)} ·{" "}
+                          <a href={ai.mediaUrl} target="_blank" rel="noopener noreferrer" className={ui.link}>
+                            {ai.kind === "video" ? "watch the packing video" : "see the packing photo"}
+                          </a>
+                        </>
+                      ) : (
+                        "Not checked"
                       )}
                     </dd>
                   </div>

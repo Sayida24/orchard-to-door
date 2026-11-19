@@ -3,9 +3,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import type { ComplaintStatus, OrderStatus } from "@prisma/client";
+import { AiResultView } from "@/components/ai-result";
 import { Photo } from "@/components/photo";
 import { Stars } from "@/components/stars";
 import { requireUser } from "@/lib/auth";
+import { parseStoredAi } from "@/lib/inspection";
 import { APPROVAL_HOURS, approvalHoursLeft, CUSTOMER_CANCELLED, expireUnapprovedOrders, NOT_APPROVED_IN_TIME } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { dateLabel, orderNumber, taka, timeLabel } from "@/lib/shop";
@@ -58,11 +60,13 @@ async function OrderStatusContent({
       deliveryArea: { select: { name: true } },
       review: true,
       complaints: { orderBy: { createdAt: "desc" } },
+      boxes: { where: { aiCheckedAt: { not: null } }, orderBy: { aiCheckedAt: "desc" }, take: 1, select: { aiDetections: true } },
     },
   });
   if (!order || order.customerId !== user.id) notFound();
 
   const sellerFirst = order.batch.seller.name.split(" ")[0];
+  const aiCheck = parseStoredAi(order.boxes[0]?.aiDetections);
   const STEPS: { status: OrderStatus; title: string; note: string }[] = [
     { status: "PLACED", title: "Placed", note: "The seller has been told about your order." },
     { status: "APPROVED", title: "Approved by the seller", note: `${sellerFirst} approves it within ${APPROVAL_HOURS} hours.` },
@@ -196,6 +200,18 @@ async function OrderStatusContent({
           </ol>
         )}
       </section>
+
+      {aiCheck && (order.status === "PACKED" || order.status === "DISPATCHED" || order.status === "DELIVERED") && (
+        <section className={`${card} space-y-3`} aria-labelledby="ai-check">
+          <h2 id="ai-check" className={h2}>
+            AI check of your box
+          </h2>
+          <p className="text-sm text-muted">
+            {sellerFirst} recorded your box while packing it, and our AI looked at every mango.
+          </p>
+          <AiResultView data={aiCheck} />
+        </section>
+      )}
 
       {order.status === "DISPATCHED" && <ConfirmDelivery orderId={order.id} total={taka(order.totalPrice)} />}
 

@@ -10,8 +10,9 @@ const links = [
   { href: "/seller/orchards", label: "My orchards" },
   { href: "/seller/batches", label: "Harvest batches" },
   { href: "/seller/orders", label: "Orders & packing" },
+  { href: "/seller/inspection", label: "AI inspection" },
 ];
-const soon = ["AI inspection", "QR verification", "Orchard media"];
+const soon = ["QR verification", "Orchard media"];
 
 export function SellerNav() {
   const pathname = usePathname();
