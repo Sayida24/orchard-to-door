@@ -38,7 +38,13 @@ const VIDEO_COPY = "q_auto";
 /** A signed pass for one upload into `folder`; the browser posts the file with these fields. */
 export function uploadPass(folder: string, kind: MediaKind) {
   const { cloud, key, secret } = config();
-  const params: Record<string, string> = { public_id: `${folder}/${randomUUID()}`, timestamp: now() };
+  const params: Record<string, string> = {
+    public_id: `${folder}/${randomUUID()}`,
+    // The folder in the path above is just part of the file's name. On accounts with dynamic
+    // folders (all new ones) this also files it under that folder in the Media Library.
+    asset_folder: folder,
+    timestamp: now(),
+  };
   if (kind === "video") params.eager = `${VIDEO_COPY}/mp4`;
   return {
     url: `https://api.cloudinary.com/v1_1/${cloud}/${kind}/upload`,
