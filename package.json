@@ -37,7 +37,8 @@
     "typescript": "^5"
   },
   "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "schema": "supabase/schema.prisma",
+    "seed": "tsx supabase/seed.ts"
   },
   "allowScripts": {
     "@prisma/client@5.22.0": true,
