@@ -237,6 +237,9 @@ function OrderActions({ o, now }: { o: Row; now: Date }) {
       return (
         <div className="space-y-1 border-t border-stone-100 pt-3">
           <div className="flex flex-wrap items-start gap-2">
+            <Link href={`/seller/inspection/${o.id}`} className={ui.buttonSecondary}>
+              AI check
+            </Link>
             <form action={packOrder}>
               {hidden}
               <SubmitButton pendingText="Saving…">Mark packed</SubmitButton>
