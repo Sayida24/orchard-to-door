@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-// The tabs from the seller dashboard design. The last three arrive with
-// harvest video storage (Part B) and smart packing (Part C).
+// Seller dashboard navigation tabs.
 const links = [
   { href: "/seller", label: "Overview" },
   { href: "/seller/orchards", label: "My orchards" },
@@ -12,8 +11,8 @@ const links = [
   { href: "/seller/orders", label: "Orders & packing" },
   { href: "/seller/inspection", label: "AI inspection" },
   { href: "/seller/qr", label: "QR verification" },
+  { href: "/seller/media", label: "Orchard media" },
 ];
-const soon = ["Orchard media"];
 
 export function SellerNav() {
   const pathname = usePathname();
@@ -36,14 +35,6 @@ export function SellerNav() {
             </li>
           );
         })}
-        {soon.map((label) => (
-          <li key={label} className="flex items-center gap-1.5 whitespace-nowrap px-3 py-3 text-sm text-stone-400">
-            {label}
-            <span className="rounded-full bg-stone-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-stone-500">
-              Soon
-            </span>
-          </li>
-        ))}
       </ul>
     </nav>
   );
