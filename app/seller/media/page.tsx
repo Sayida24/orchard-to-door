@@ -3,8 +3,17 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { SubmitButton } from "@/components/submit-button";
 import { requireUser } from "@/lib/auth";
+import { syncOrchardVideoWarnings } from "@/lib/orchard-videos";
 import { prisma } from "@/lib/prisma";
-import { dateLabel, durationLabel, timeLabel } from "@/lib/shop";
+import {
+  DAY_MS,
+  dateLabel,
+  durationLabel,
+  ORCHARD_VIDEO_LIMIT,
+  ORCHARD_VIDEO_WARN_DAYS,
+  orchardVideoStatus,
+  timeLabel,
+} from "@/lib/shop";
 import { ui } from "@/lib/ui";
 import { deleteOrchardVideo } from "./actions";
 import { OrchardVideoUploader, type OrchardOption } from "./video-uploader";
@@ -17,7 +26,8 @@ export default function SellerOrchardMediaPage({
       <div className="mb-4">
         <h1 className="text-2xl font-bold">Orchard media</h1>
         <p className="text-sm text-stone-600">
-          Upload short harvest and orchard videos for your customers, or remove ones you no longer want to show.
+          Upload up to {ORCHARD_VIDEO_LIMIT} videos per orchard or remove any video whenever you want. If an orchard
+          keeps {ORCHARD_VIDEO_LIMIT} videos for over 1 month, you&apos;ll get a reminder to clear old ones.
         </p>
       </div>
       <Suspense fallback={<p className="text-stone-500">Loading orchard media…</p>}>
@@ -42,11 +52,13 @@ async function MediaContent({
   const sp = await searchParams;
   const initialOrchardId = typeof sp.orchard === "string" ? sp.orchard : undefined;
 
-  const [orchards, videos] = await Promise.all([
+  const [warnings, orchards, videos] = await Promise.all([
+    syncOrchardVideoWarnings(user.id),
     prisma.orchard.findMany({
       where: { sellerId: user.id },
       orderBy: { name: "asc" },
       include: {
+        videos: { orderBy: { recordedAt: "asc" }, select: { recordedAt: true } },
         batches: {
           orderBy: { harvestDate: "desc" },
           take: 15,
@@ -78,17 +90,36 @@ async function MediaContent({
     );
   }
 
-  const orchardOptions: OrchardOption[] = orchards.map((o) => ({
-    id: o.id,
-    name: o.name,
-    batches: o.batches.map((b) => ({
-      id: b.id,
-      label: `${b.variety.name} · ${dateLabel(b.harvestDate)} (${Math.floor(b.availableKg)} kg left)`,
-    })),
-  }));
+  const now = new Date();
+  const orchardOptions: OrchardOption[] = orchards.map((o) => {
+    const status = orchardVideoStatus(o.videos.length, o.videos[0]?.recordedAt ?? null, now);
+    return {
+      id: o.id,
+      name: o.name,
+      videoCount: o.videos.length,
+      canUpload: status.canUpload,
+      needsCleanupWarning: status.needsCleanupWarning,
+      batches: o.batches.map((b) => ({
+        id: b.id,
+        label: `${b.variety.name} · ${dateLabel(b.harvestDate)} (${Math.floor(b.availableKg)} kg left)`,
+      })),
+    };
+  });
 
   return (
     <div className="space-y-6">
+      {warnings.map((w) => (
+        <div
+          key={w.orchardId}
+          role="status"
+          className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+        >
+          <strong>Cleanup reminder for {w.orchardName}:</strong> You have {w.count} videos and the oldest has been up
+          for {w.oldestAgeDays} days (~1 month). Please remove older videos if you no longer need them — you can still
+          upload new ones either way.
+        </div>
+      ))}
+
       <OrchardVideoUploader orchards={orchardOptions} initialOrchardId={initialOrchardId} />
 
       <section aria-labelledby="uploaded-videos" className="space-y-3">
@@ -116,11 +147,18 @@ async function MediaContent({
                   />
 
                   <div className="space-y-1.5">
-                    {v.batch && (
-                      <span className="inline-block rounded-full bg-mango-soft px-2.5 py-0.5 text-xs font-semibold text-mango-ink">
-                        {v.batch.variety.name}
-                      </span>
-                    )}
+                    <div className="flex flex-wrap gap-1.5">
+                      {v.batch && (
+                        <span className="inline-block rounded-full bg-mango-soft px-2.5 py-0.5 text-xs font-semibold text-mango-ink">
+                          {v.batch.variety.name}
+                        </span>
+                      )}
+                      {now.getTime() - v.recordedAt.getTime() >= ORCHARD_VIDEO_WARN_DAYS * DAY_MS && (
+                        <span className="inline-block rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-900">
+                          Over 1 month old
+                        </span>
+                      )}
+                    </div>
 
                     <p className="font-bold text-stone-900">{v.title ?? "Orchard harvest video"}</p>
                     <p className="text-sm text-stone-600">

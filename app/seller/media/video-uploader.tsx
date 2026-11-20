@@ -3,12 +3,16 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { MAX_VIDEO_BYTES } from "@/lib/inspection";
+import { ORCHARD_VIDEO_LIMIT } from "@/lib/shop";
 import { ui } from "@/lib/ui";
 import { prepareOrchardVideoUpload, saveOrchardVideo } from "./actions";
 
 export type OrchardOption = {
   id: string;
   name: string;
+  videoCount: number;
+  canUpload: boolean;
+  needsCleanupWarning: boolean;
   batches: { id: string; label: string }[];
 };
 
@@ -91,6 +95,7 @@ export function OrchardVideoUploader({
 
   const currentOrchard = orchards.find((o) => o.id === orchardId) ?? orchards[0];
   const batches = currentOrchard?.batches ?? [];
+  const uploadBlocked = currentOrchard ? !currentOrchard.canUpload : false;
 
   async function onPickFile(picked: File | undefined) {
     setError(null);
@@ -179,12 +184,42 @@ export function OrchardVideoUploader({
 
   return (
     <form onSubmit={onSubmit} className={`${ui.card} space-y-4`}>
-      <div>
-        <h2 className="text-lg font-bold text-stone-900">Upload an orchard video</h2>
-        <p className="text-sm text-stone-600">
-          Show customers fresh picking or trees in your orchard.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h2 className="text-lg font-bold text-stone-900">Upload an orchard video</h2>
+          <p className="text-sm text-stone-600">
+            Show customers fresh picking or trees in your orchard (up to {ORCHARD_VIDEO_LIMIT} videos per orchard).
+          </p>
+        </div>
+        {currentOrchard && (
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+              currentOrchard.needsCleanupWarning
+                ? "bg-mango-soft text-mango-ink"
+                : uploadBlocked
+                  ? "bg-red-100 text-red-800"
+                  : "bg-stone-100 text-stone-700"
+            }`}
+          >
+            {currentOrchard.videoCount} / {ORCHARD_VIDEO_LIMIT} videos
+          </span>
+        )}
       </div>
+
+      {currentOrchard?.needsCleanupWarning && (
+        <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <strong>Old videos reminder:</strong> {currentOrchard.name} has {currentOrchard.videoCount} videos and the
+          oldest is over 1 month old. Please remove older videos below to keep things fresh — or you can still upload a
+          new video without removing them.
+        </p>
+      )}
+
+      {uploadBlocked && currentOrchard && (
+        <p role="status" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">
+          {currentOrchard.name} already has {ORCHARD_VIDEO_LIMIT} videos (maximum {ORCHARD_VIDEO_LIMIT} per orchard).
+          Remove an older video below to upload a new one.
+        </p>
+      )}
 
       {savedMsg && (
         <p role="status" className="rounded-xl bg-leaf-soft px-4 py-3 text-sm font-semibold text-leaf">
@@ -267,7 +302,7 @@ export function OrchardVideoUploader({
           id="orchard-video-file"
           type="file"
           accept="video/*"
-          disabled={uploading}
+          disabled={uploading || uploadBlocked}
           onChange={(e) => void onPickFile(e.target.files?.[0])}
           className="mt-1 block w-full rounded-xl border border-dashed border-[#DCD4C3] bg-stone-50 px-3 py-3 text-sm text-stone-700 file:mr-3 file:rounded-lg file:border-0 file:bg-mango file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-ink hover:file:bg-mango-dark disabled:opacity-50"
         />
@@ -299,7 +334,7 @@ export function OrchardVideoUploader({
       )}
 
       <div className="flex justify-end">
-        <button type="submit" disabled={uploading || !file} className={ui.button}>
+        <button type="submit" disabled={uploading || uploadBlocked || !file} className={ui.button}>
           {uploading ? "Uploading…" : "Upload orchard video"}
         </button>
       </div>

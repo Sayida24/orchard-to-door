@@ -4,9 +4,7 @@ import type { Prisma } from "@prisma/client";
 
 export const GIFT_BOX_FEE = 120; // taka, added once per order
 export const DAY_MS = 24 * 60 * 60 * 1000;
-
 const DHAKA_OFFSET_MS = 6 * 60 * 60 * 1000; // Bangladesh is UTC+6 all year
-
 
 /** A batch customers can order from: open, stock left, not past its closing date (FR-08). */
 export function openBatchWhere(now: Date): Prisma.BatchWhereInput {
@@ -54,6 +52,25 @@ export function durationLabel(sec: number | null) {
   return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
 }
 
+/** Max videos per orchard before 1 month, and age (days) when a cleanup warning is sent. */
+export const ORCHARD_VIDEO_LIMIT = 7;
+export const ORCHARD_VIDEO_WARN_DAYS = 30;
+
+export function orchardVideoStatus(count: number, oldestRecordedAt: Date | null, now = new Date()) {
+  const atLimit = count >= ORCHARD_VIDEO_LIMIT;
+  const oldestAgeDays = oldestRecordedAt
+    ? Math.floor((now.getTime() - oldestRecordedAt.getTime()) / DAY_MS)
+    : 0;
+  const hasMonthOldVideo = oldestRecordedAt !== null && oldestAgeDays >= ORCHARD_VIDEO_WARN_DAYS;
+  return {
+    atLimit,
+    oldestAgeDays,
+    hasMonthOldVideo,
+    needsCleanupWarning: atLimit && hasMonthOldVideo,
+    canUpload: !atLimit || hasMonthOldVideo,
+  };
+}
+
 export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export const orderNumber = (id: string) => id.slice(-6).toUpperCase();
@@ -97,5 +114,3 @@ export const COMPLAINT_REASONS = [
   "Late delivery",
   "Something else",
 ];
-/** A customer can attach this many photos to a problem report. */
-export const MAX_REPORT_PHOTOS = 2;

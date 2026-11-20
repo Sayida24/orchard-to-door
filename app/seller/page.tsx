@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import type { OrderStatus } from "@prisma/client";
 import { Stars } from "@/components/stars";
 import { requireUser } from "@/lib/auth";
+import { syncOrchardVideoWarnings } from "@/lib/orchard-videos";
 import { expireUnapprovedOrders } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import { DAY_MS, dateLabel, openBatchWhere, taka, timeLabel } from "@/lib/shop";
@@ -25,6 +26,7 @@ async function Overview() {
   const user = await requireUser(["SELLER"]);
   await connection();
   await expireUnapprovedOrders();
+  const videoWarnings = await syncOrchardVideoWarnings(user.id);
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * DAY_MS);
   const mine = { batch: { sellerId: user.id } };
@@ -36,9 +38,7 @@ async function Overview() {
       select: { id: true, name: true, isActive: true },
     }),
     prisma.order.groupBy({ by: ["status"], where: mine, _count: { _all: true } }),
-    prisma.complaint.count({
-      where: { OR: [{ status: "OPEN" }, { status: "APPROVED", completedAt: null }], order: mine },
-    }),
+    prisma.complaint.count({ where: { status: "APPROVED", completedAt: null, order: mine } }),
     prisma.batch.findMany({ where: { sellerId: user.id, ...openBatchWhere(now) }, select: { availableKg: true } }),
     prisma.order.aggregate({
       where: { ...mine, status: "DELIVERED", deliveredAt: { gte: weekAgo } },
@@ -65,10 +65,10 @@ async function Overview() {
     { href: "/seller/orders?show=packed", title: "To dispatch", value: count("PACKED"), note: "packed, not sent", alert: false },
     { href: "/seller/orders?show=dispatched", title: "On the way", value: count("DISPATCHED"), note: "with customers soon", alert: false },
     {
-      href: "/seller/reports",
-      title: "Problem reports",
+      href: "/seller/orders",
+      title: "Refunds & new boxes",
       value: toFinish,
-      note: toFinish ? "to decide or finish" : "nothing to do",
+      note: toFinish ? "approved, still to do" : "nothing to do",
       alert: toFinish > 0,
     },
   ];
@@ -95,6 +95,21 @@ async function Overview() {
         <p key={o.id} role="status" className="rounded-2xl border border-stone-400 bg-stone-100 px-4 py-3 text-sm font-semibold text-stone-800">
           An admin paused {o.name}. Customers can&apos;t order from it until it&apos;s resumed. Orders already placed carry on.
         </p>
+      ))}
+      {videoWarnings.map((w) => (
+        <div
+          key={w.orchardId}
+          role="status"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+        >
+          <span>
+            <strong>{w.orchardName}</strong> has {w.count} videos and the oldest is over 1 month old. Please remove old
+            videos when you can (you can still upload new ones).
+          </span>
+          <Link href={`/seller/media?orchard=${w.orchardId}`} className="font-semibold underline underline-offset-2">
+            Manage videos →
+          </Link>
+        </div>
       ))}
 
       <ul className="grid grid-cols-2 gap-3 lg:grid-cols-5">

@@ -13,6 +13,7 @@ import {
 } from "@/lib/cloudinary";
 import { MAX_VIDEO_BYTES } from "@/lib/inspection";
 import { prisma } from "@/lib/prisma";
+import { ORCHARD_VIDEO_LIMIT, orchardVideoStatus } from "@/lib/shop";
 
 const folderFor = (orchardId: string) => `orchiva/orchards/${orchardId}`;
 
@@ -37,9 +38,20 @@ export async function prepareOrchardVideoUpload(
   const user = await requireUser(["SELLER"]);
   const orchard = await prisma.orchard.findFirst({
     where: { id: orchardId, sellerId: user.id },
-    select: { id: true },
+    select: {
+      id: true,
+      videos: { orderBy: { recordedAt: "asc" }, select: { recordedAt: true } },
+    },
   });
   if (!orchard) return { ok: false, error: "Choose one of your orchards." };
+
+  const status = orchardVideoStatus(orchard.videos.length, orchard.videos[0]?.recordedAt ?? null);
+  if (!status.canUpload) {
+    return {
+      ok: false,
+      error: `This orchard already has ${ORCHARD_VIDEO_LIMIT} videos (maximum ${ORCHARD_VIDEO_LIMIT}). Remove an older video first to upload a new one.`,
+    };
+  }
 
   if (!(size > 0 && size <= MAX_VIDEO_BYTES)) {
     return { ok: false, error: "The video must be under 100 MB." };
@@ -68,9 +80,20 @@ export async function saveOrchardVideo(input: SaveOrchardVideoInput): Promise<Sa
   const user = await requireUser(["SELLER"]);
   const orchard = await prisma.orchard.findFirst({
     where: { id: input.orchardId, sellerId: user.id },
-    select: { id: true },
+    select: {
+      id: true,
+      videos: { orderBy: { recordedAt: "asc" }, select: { recordedAt: true } },
+    },
   });
   if (!orchard) return { ok: false, error: "Choose one of your orchards." };
+
+  const status = orchardVideoStatus(orchard.videos.length, orchard.videos[0]?.recordedAt ?? null);
+  if (!status.canUpload) {
+    return {
+      ok: false,
+      error: `This orchard already has ${ORCHARD_VIDEO_LIMIT} videos (maximum ${ORCHARD_VIDEO_LIMIT}). Remove an older video first to upload a new one.`,
+    };
+  }
 
   if (!input.publicId.startsWith(`${folderFor(orchard.id)}/`) || input.publicId.includes("..")) {
     return { ok: false, error: "That upload doesn't belong to this orchard." };
