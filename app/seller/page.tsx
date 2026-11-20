@@ -6,7 +6,7 @@ import { Stars } from "@/components/stars";
 import { requireUser } from "@/lib/auth";
 import { expireUnapprovedOrders } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
-import { DAY_MS, dateLabel, openBatchWhere, ORCHARD_VIDEO_MAX_DAYS, taka, timeLabel, videoCutoffDate } from "@/lib/shop";
+import { DAY_MS, dateLabel, openBatchWhere, taka, timeLabel } from "@/lib/shop";
 import { ui } from "@/lib/ui";
 
 export default function SellerHome() {
@@ -29,7 +29,7 @@ async function Overview() {
   const weekAgo = new Date(now.getTime() - 7 * DAY_MS);
   const mine = { batch: { sellerId: user.id } };
 
-  const [orchards, byStatus, toFinish, onSale, week, ratings, notes, overdueVideos] = await Promise.all([
+  const [orchards, byStatus, toFinish, onSale, week, ratings, notes] = await Promise.all([
     prisma.orchard.findMany({
       where: { sellerId: user.id },
       orderBy: { name: "asc" },
@@ -47,9 +47,6 @@ async function Overview() {
     }),
     prisma.review.aggregate({ where: { orchard: { sellerId: user.id } }, _avg: { rating: true }, _count: { _all: true } }),
     prisma.notification.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" }, take: 5 }),
-    prisma.harvestVideo.count({
-      where: { orchard: { sellerId: user.id }, recordedAt: { lt: videoCutoffDate(now) } },
-    }),
   ]);
 
   const count = (s: OrderStatus) => byStatus.find((b) => b.status === s)?._count._all ?? 0;
@@ -99,20 +96,6 @@ async function Overview() {
           An admin paused {o.name}. Customers can&apos;t order from it until it&apos;s resumed. Orders already placed carry on.
         </p>
       ))}
-      {overdueVideos > 0 && (
-        <div
-          role="alert"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900"
-        >
-          <p className="font-semibold">
-            {overdueVideos} orchard {overdueVideos === 1 ? "video is" : "videos are"} past the{" "}
-            {ORCHARD_VIDEO_MAX_DAYS}-day removal limit.
-          </p>
-          <Link href="/seller/media" className="font-bold text-red-800 underline underline-offset-2 hover:text-red-950">
-            Remove in Orchard media →
-          </Link>
-        </div>
-      )}
 
       <ul className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         {cards.map((c) => (

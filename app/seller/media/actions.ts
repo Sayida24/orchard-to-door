@@ -13,22 +13,12 @@ import {
 } from "@/lib/cloudinary";
 import { MAX_VIDEO_BYTES } from "@/lib/inspection";
 import { prisma } from "@/lib/prisma";
-import { ORCHARD_VIDEO_MAX_DAYS, videoCutoffDate } from "@/lib/shop";
 
 const folderFor = (orchardId: string) => `orchiva/orchards/${orchardId}`;
 
 export type OrchardVideoUploadPass =
   | { ok: true; url: string; fields: Record<string, string> }
   | { ok: false; error: string };
-
-async function countOverdueVideos(sellerId: string) {
-  return prisma.harvestVideo.count({
-    where: {
-      orchard: { sellerId },
-      recordedAt: { lt: videoCutoffDate(new Date()) },
-    },
-  });
-}
 
 function revalidateMediaPaths(orchardIds: string[]) {
   revalidatePath("/seller/media");
@@ -50,14 +40,6 @@ export async function prepareOrchardVideoUpload(
     select: { id: true },
   });
   if (!orchard) return { ok: false, error: "Choose one of your orchards." };
-
-  const overdue = await countOverdueVideos(user.id);
-  if (overdue > 0) {
-    return {
-      ok: false,
-      error: `Remove ${overdue === 1 ? "the video" : `all ${overdue} videos`} older than ${ORCHARD_VIDEO_MAX_DAYS} days before uploading a new one.`,
-    };
-  }
 
   if (!(size > 0 && size <= MAX_VIDEO_BYTES)) {
     return { ok: false, error: "The video must be under 100 MB." };
@@ -89,14 +71,6 @@ export async function saveOrchardVideo(input: SaveOrchardVideoInput): Promise<Sa
     select: { id: true },
   });
   if (!orchard) return { ok: false, error: "Choose one of your orchards." };
-
-  const overdue = await countOverdueVideos(user.id);
-  if (overdue > 0) {
-    return {
-      ok: false,
-      error: `Remove videos older than ${ORCHARD_VIDEO_MAX_DAYS} days before adding a new one.`,
-    };
-  }
 
   if (!input.publicId.startsWith(`${folderFor(orchard.id)}/`) || input.publicId.includes("..")) {
     return { ok: false, error: "That upload doesn't belong to this orchard." };
@@ -165,29 +139,4 @@ export async function deleteOrchardVideo(formData: FormData) {
   }
 
   revalidateMediaPaths([video.orchardId]);
-}
-
-export async function deleteOverdueVideos() {
-  const user = await requireUser(["SELLER"]);
-  const overdue = await prisma.harvestVideo.findMany({
-    where: {
-      orchard: { sellerId: user.id },
-      recordedAt: { lt: videoCutoffDate(new Date()) },
-    },
-    select: { id: true, url: true, orchardId: true },
-  });
-  if (overdue.length === 0) return;
-
-  await Promise.allSettled(
-    overdue.map((v) => {
-      const publicId = publicIdFromVideoUrl(v.url);
-      return publicId ? deleteMedia(publicId, "video") : Promise.resolve();
-    }),
-  );
-
-  await prisma.harvestVideo.deleteMany({
-    where: { id: { in: overdue.map((v) => v.id) } },
-  });
-
-  revalidateMediaPaths(overdue.map((v) => v.orchardId));
 }

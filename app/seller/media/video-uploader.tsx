@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { MAX_VIDEO_BYTES } from "@/lib/inspection";
-import { ORCHARD_VIDEO_MAX_DAYS } from "@/lib/shop";
 import { ui } from "@/lib/ui";
 import { prepareOrchardVideoUpload, saveOrchardVideo } from "./actions";
 
@@ -64,11 +63,9 @@ function formatMb(bytes: number) {
 export function OrchardVideoUploader({
   orchards,
   initialOrchardId,
-  overdueCount,
 }: {
   orchards: OrchardOption[];
   initialOrchardId?: string;
-  overdueCount: number;
 }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -94,7 +91,6 @@ export function OrchardVideoUploader({
 
   const currentOrchard = orchards.find((o) => o.id === orchardId) ?? orchards[0];
   const batches = currentOrchard?.batches ?? [];
-  const blockedByOverdue = overdueCount > 0;
 
   async function onPickFile(picked: File | undefined) {
     setError(null);
@@ -121,10 +117,6 @@ export function OrchardVideoUploader({
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (blockedByOverdue) {
-      setError(`Remove videos older than ${ORCHARD_VIDEO_MAX_DAYS} days before uploading a new one.`);
-      return;
-    }
     if (!orchardId) {
       setError("Choose an orchard.");
       return;
@@ -187,26 +179,16 @@ export function OrchardVideoUploader({
 
   return (
     <form onSubmit={onSubmit} className={`${ui.card} space-y-4`}>
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h2 className="text-lg font-bold text-stone-900">Upload an orchard video</h2>
-          <p className="text-sm text-stone-600">
-            Show customers fresh picking or trees in your orchard. Videos stay visible for up to{" "}
-            <strong>{ORCHARD_VIDEO_MAX_DAYS} days</strong> and must be removed within {ORCHARD_VIDEO_MAX_DAYS} days.
-          </p>
-        </div>
+      <div>
+        <h2 className="text-lg font-bold text-stone-900">Upload an orchard video</h2>
+        <p className="text-sm text-stone-600">
+          Show customers fresh picking or trees in your orchard.
+        </p>
       </div>
 
       {savedMsg && (
         <p role="status" className="rounded-xl bg-leaf-soft px-4 py-3 text-sm font-semibold text-leaf">
-          Video uploaded. Remember to remove it within {ORCHARD_VIDEO_MAX_DAYS} days.
-        </p>
-      )}
-
-      {blockedByOverdue && (
-        <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-900">
-          Uploads are paused until you remove {overdueCount === 1 ? "the video" : `all ${overdueCount} videos`} past the{" "}
-          {ORCHARD_VIDEO_MAX_DAYS}-day removal deadline below.
+          Video uploaded and live on your orchard page.
         </p>
       )}
 
@@ -224,7 +206,7 @@ export function OrchardVideoUploader({
           <select
             id="orchardId"
             value={orchardId}
-            disabled={uploading || blockedByOverdue}
+            disabled={uploading}
             onChange={(e) => {
               setOrchardId(e.target.value);
               setBatchId("");
@@ -246,7 +228,7 @@ export function OrchardVideoUploader({
           <select
             id="batchId"
             value={batchId}
-            disabled={uploading || blockedByOverdue || batches.length === 0}
+            disabled={uploading || batches.length === 0}
             onChange={(e) => setBatchId(e.target.value)}
             className={ui.input}
           >
@@ -269,7 +251,7 @@ export function OrchardVideoUploader({
           type="text"
           maxLength={80}
           value={title}
-          disabled={uploading || blockedByOverdue}
+          disabled={uploading}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="e.g. Morning Himsagar picking"
           className={ui.input}
@@ -285,7 +267,7 @@ export function OrchardVideoUploader({
           id="orchard-video-file"
           type="file"
           accept="video/*"
-          disabled={uploading || blockedByOverdue}
+          disabled={uploading}
           onChange={(e) => void onPickFile(e.target.files?.[0])}
           className="mt-1 block w-full rounded-xl border border-dashed border-[#DCD4C3] bg-stone-50 px-3 py-3 text-sm text-stone-700 file:mr-3 file:rounded-lg file:border-0 file:bg-mango file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-ink hover:file:bg-mango-dark disabled:opacity-50"
         />
@@ -316,11 +298,8 @@ export function OrchardVideoUploader({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-stone-500">
-          3-day rule: every uploaded video must be deleted within {ORCHARD_VIDEO_MAX_DAYS} days.
-        </p>
-        <button type="submit" disabled={uploading || blockedByOverdue || !file} className={ui.button}>
+      <div className="flex justify-end">
+        <button type="submit" disabled={uploading || !file} className={ui.button}>
           {uploading ? "Uploading…" : "Upload orchard video"}
         </button>
       </div>
