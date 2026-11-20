@@ -29,7 +29,8 @@ export function QrLabelCard(props: QrLabelProps) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    const fullUrl = `${window.location.origin}/verify/${encodeURIComponent(props.qrCode)}`;
+    const base = (process.env.NEXT_PUBLIC_APP_URL || window.location.origin).replace(/\/+$/, "");
+    const fullUrl = `${base}/verify/${encodeURIComponent(props.qrCode)}`;
     let active = true;
     QRCode.toDataURL(fullUrl, {
       width: 560,
@@ -288,6 +289,14 @@ export function QrLabelCard(props: QrLabelProps) {
         </span>
         <span className="truncate font-mono">{verifyUrl}</span>
       </div>
+      {verifyUrl.startsWith("http://localhost") && (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 print:hidden">
+          Running on <span className="font-mono font-semibold">localhost</span>: a phone camera can&apos;t open{" "}
+          <span className="font-mono">localhost</span> on your computer. Test with{" "}
+          <strong>Preview customer scan page</strong> above, or open the app via your computer&apos;s Wi-Fi IP (or
+          deployed URL) so your phone can scan it.
+        </p>
+      )}
     </div>
   );
 }

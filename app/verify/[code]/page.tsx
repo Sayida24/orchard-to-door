@@ -2,14 +2,21 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import type { OrderStatus } from "@prisma/client";
+import type { OrderStatus, PaymentMethod } from "@prisma/client";
 import { AiResultView } from "@/components/ai-result";
 import { Photo } from "@/components/photo";
 import { ORDER_STATUS } from "@/app/customer/orders/status";
 import { getCurrentUser } from "@/lib/auth";
 import { parseStoredAi, summaryLine } from "@/lib/inspection";
 import { prisma } from "@/lib/prisma";
-import { dateLabel, dayLabel, MONTHS, orderNumber, timeLabel } from "@/lib/shop";
+import { dateLabel, dayLabel, MONTHS, orderNumber, taka, timeLabel } from "@/lib/shop";
+
+const PAYMENT_LABEL: Record<PaymentMethod, string> = {
+  CASH_ON_DELIVERY: "Cash on delivery",
+  BKASH: "bKash",
+  NAGAD: "Nagad",
+  CARD: "Card",
+};
 
 export const metadata: Metadata = {
   title: "Box verification · Orchiva",
@@ -44,7 +51,16 @@ async function VerifyContent({ params }: { params: Promise<{ code: string }> }) 
             id: true,
             customerId: true,
             quantityKg: true,
+            pricePerKg: true,
             isGiftBox: true,
+            giftFee: true,
+            deliveryFee: true,
+            totalPrice: true,
+            address: true,
+            landmark: true,
+            deliverySlot: true,
+            paymentMethod: true,
+            deliveryArea: { select: { name: true } },
             status: true,
             createdAt: true,
             approvedAt: true,
@@ -123,6 +139,7 @@ async function VerifyContent({ params }: { params: Promise<{ code: string }> }) 
   const orchard = order.batch.orchard;
   const status = ORDER_STATUS[order.status];
   const isOwner = user?.id === order.customerId;
+  const fruitTotal = order.quantityKg * order.pricePerKg;
 
   const journey: { status: OrderStatus; title: string; at: Date | null }[] = [
     { status: "PLACED", title: "Order placed", at: order.createdAt },
@@ -256,6 +273,78 @@ async function VerifyContent({ params }: { params: Promise<{ code: string }> }) 
               </dd>
             </div>
           )}
+        </dl>
+      </section>
+
+      {/* Order Details */}
+      <section className={`${card} space-y-4`} aria-labelledby="order-details">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="order-details" className={h2}>
+            Order details
+          </h2>
+          <span className="text-xs text-muted">
+            Placed {dateLabel(order.createdAt)}, {timeLabel(order.createdAt)}
+          </span>
+        </div>
+
+        <dl className="grid gap-3 text-sm sm:grid-cols-2">
+          <div>
+            <dt className="text-xs text-muted">Order number</dt>
+            <dd className="font-mono font-bold text-ink">#{num}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted">Mangoes</dt>
+            <dd className="font-semibold text-ink">
+              {order.quantityKg} kg {variety.name} ({taka(order.pricePerKg)}/kg)
+            </dd>
+          </div>
+          {order.deliveryArea?.name && (
+            <div>
+              <dt className="text-xs text-muted">Delivery area</dt>
+              <dd className="font-semibold text-ink">
+                {isOwner
+                  ? `${order.address}${order.landmark ? ` (${order.landmark})` : ""}, ${order.deliveryArea.name}`
+                  : order.deliveryArea.name}
+              </dd>
+            </div>
+          )}
+          {order.deliverySlot && (
+            <div>
+              <dt className="text-xs text-muted">Delivery slot</dt>
+              <dd className="font-semibold text-ink">{order.deliverySlot}</dd>
+            </div>
+          )}
+          <div>
+            <dt className="text-xs text-muted">Payment</dt>
+            <dd className="font-semibold text-ink">{PAYMENT_LABEL[order.paymentMethod]}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted">Packaging</dt>
+            <dd className="font-semibold text-ink">{order.isGiftBox ? "Gift box" : "Standard box"}</dd>
+          </div>
+        </dl>
+
+        <dl className="space-y-1.5 border-t border-line pt-3 text-sm text-ink">
+          <div className="flex justify-between">
+            <dt>
+              Mangoes ({order.quantityKg} kg × {taka(order.pricePerKg)})
+            </dt>
+            <dd>{taka(fruitTotal)}</dd>
+          </div>
+          {order.isGiftBox && (
+            <div className="flex justify-between">
+              <dt>Gift box</dt>
+              <dd>{taka(order.giftFee)}</dd>
+            </div>
+          )}
+          <div className="flex justify-between">
+            <dt>Delivery fee</dt>
+            <dd>{taka(order.deliveryFee)}</dd>
+          </div>
+          <div className="flex items-baseline justify-between border-t border-line pt-2">
+            <dt className="font-display text-lg font-semibold">Total</dt>
+            <dd className="font-display text-xl font-bold">{taka(order.totalPrice)}</dd>
+          </div>
         </dl>
       </section>
 
