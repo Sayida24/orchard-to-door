@@ -64,6 +64,8 @@ Orchiva is an online mango shop that connects customers in Bangladesh directly w
 
 ## Contributions by Sayida Parvin ([@Sayida24](https://github.com/Sayida24))
 
+A day-by-day record of this work is in [JOURNAL.md](JOURNAL.md).
+
 - **Project setup and database:** created the Next.js project; designed the database (users, orchards, varieties, batches, orders, boxes, reports, reviews, notifications, delivery areas) and wrote every migration; set up Supabase and the Vercel deployment.
 - **Accounts:** phone-or-email login, roles (customer, seller, admin), the new login page design, and forgotten-password reset by email or an admin's one-time link.
 - **Admin panel:** user management and adding sellers, orchard quality and pause/resume, problem reports (first names only, filtered by orchard), variety rename and merge, delivery areas, and the overview. Removed the admin's access to orders, for customer privacy.
