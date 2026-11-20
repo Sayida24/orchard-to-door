@@ -77,9 +77,7 @@ export default function Home() {
               I have an account
             </Link>
 
-            <Link href="/verify" className={ui.buttonSecondary}>
-              Verify a box
-            </Link>
+          
           </div>
 
           <p className="mt-5 text-sm text-stone-500">
