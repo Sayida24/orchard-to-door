@@ -14,7 +14,8 @@ Orchiva is an online mango shop that connects customers in Bangladesh directly w
   - pay cash on delivery.
 - Track each order: Placed → Approved → Packed → Dispatched → Delivered.
 - Cancel while the order waits for the seller's approval.
-- Confirm delivery, rate the order (1–5 stars) or report a problem.
+- Confirm delivery, rate the order (1–5 stars) or report a problem, with up to 2 photos.
+- Scan the QR code on a box to see where it came from and its AI check.
 - Watch the **AI check of your box**: the packing video with boxes drawn around each mango, the share of healthy and diseased mangoes, and a warning if disease was found.
 
 ### Sellers
@@ -24,12 +25,14 @@ Orchiva is an online mango shop that connects customers in Bangladesh directly w
 - Approve or decline new orders within 24 hours. The ordered kg are held straight away, and orders nobody approves in 24 hours are cancelled automatically, returning their kg to stock.
 - Pack, dispatch and deliver orders. Cancel before packing, with a reason.
 - **AI inspection:** record or upload a short video (or photo) of each box at packing.
-- Carry out the refunds and replacements the admin approves.
+- Print a QR label for each checked box.
+- Upload short harvest videos for customers. Each video is removed within 3 days.
+- **Decide on problem reports** about their own orders: refund, send a new box, or not approved (with a reason for the customer). Then mark the refund or new box as done.
 
 ### Admin
 - Add sellers, change user roles and create password-reset links.
-- Oversee orchard quality. An orchard is flagged after 3 approved reports in 30 days or if its rating falls below 3. Pause or resume orchards.
-- Decide problem reports: refund, replacement or rejection. Admins see only the customer's first name and never handle orders.
+- Oversee orchard quality. An orchard is flagged after 3 problem reports in 30 days (whatever the seller decided) or if its rating falls below 3. Pause or resume orchards.
+- See every problem report: its photos, the seller's decision and how long the seller took. Admins see only the customer's first name and never handle orders.
 - Rename or merge mango varieties that sellers add, and manage delivery areas and charges.
 
 ### Everyone
@@ -73,10 +76,10 @@ A day-by-day record of this work is in [JOURNAL.md](JOURNAL.md).
   - orchard profiles with photo upload;
   - harvest batches;
   - the full order flow: 24-hour approval with stock held, automatic cancellation, decline or cancel with reasons, pack, dispatch, deliver;
-  - finishing approved reports, and the overview.
+  - the Reports tab for deciding and finishing problem reports, and the overview.
 - **Customer side:**
   - ordering with delivery day, availability, gift box, delivery charge and a price-change check;
-  - order tracking, cancelling, delivery confirmation, reviews, problem reports and the notification bell;
+  - order tracking, cancelling, delivery confirmation, reviews, problem reports with up to 2 photos, and the notification bell;
   - the redesign of the customer pages.
 - **AI inspection:** trained the YOLOv8n model on Kaggle and evaluated it; built in-browser detection for photos and videos with mango tracking, Cloudinary video storage, and the "AI check of your box" view for customers and admins.
 
@@ -115,6 +118,4 @@ A day-by-day record of this work is in [JOURNAL.md](JOURNAL.md).
 > **The team shares one database.** Don't run `prisma migrate dev`, `prisma db push` or `prisma db seed` against it. Schema changes are agreed first and applied once.
 
 ## Not built yet
-- **QR verification:** scan the code on a box to see its AI check.
-- **Orchard media:** sellers upload their daily harvest videos. The site shows sample videos for now.
 - **My account page:** change name, phone or password from inside the app.
