@@ -46,6 +46,7 @@ function loadOrders(sellerId: string, status: OrderStatus) {
       batch: { select: { variety: { select: { name: true } }, orchard: { select: { name: true } } } },
       review: { select: { rating: true, comment: true } },
       complaints: { where: { status: "OPEN" }, select: { id: true } },
+      boxes: { where: { aiCheckedAt: { not: null } }, orderBy: { aiCheckedAt: "desc" }, take: 1, select: { qrCode: true } },
     },
   });
 }
@@ -240,6 +241,11 @@ function OrderActions({ o, now }: { o: Row; now: Date }) {
             <Link href={`/seller/inspection/${o.id}`} className={ui.buttonSecondary}>
               AI check
             </Link>
+            {o.boxes[0]?.qrCode && (
+              <Link href={`/seller/qr/${o.id}`} className={ui.buttonSecondary}>
+                QR label
+              </Link>
+            )}
             <form action={packOrder}>
               {hidden}
               <SubmitButton pendingText="Saving…">Mark packed</SubmitButton>
@@ -256,10 +262,17 @@ function OrderActions({ o, now }: { o: Row; now: Date }) {
     case "PACKED":
       return (
         <div className="space-y-1 border-t border-stone-100 pt-3">
-          <form action={dispatchOrder}>
-            {hidden}
-            <SubmitButton pendingText="Saving…">Mark dispatched</SubmitButton>
-          </form>
+          <div className="flex flex-wrap items-start gap-2">
+            <form action={dispatchOrder}>
+              {hidden}
+              <SubmitButton pendingText="Saving…">Mark dispatched</SubmitButton>
+            </form>
+            {o.boxes[0]?.qrCode && (
+              <Link href={`/seller/qr/${o.id}`} className={ui.buttonSecondary}>
+                QR label
+              </Link>
+            )}
+          </div>
           {o.packedAt && (
             <p className="text-xs text-stone-500">
               Packed {dateLabel(o.packedAt)}, {timeLabel(o.packedAt)}
@@ -271,10 +284,17 @@ function OrderActions({ o, now }: { o: Row; now: Date }) {
       const overdue = o.dispatchedAt !== null && now.getTime() - o.dispatchedAt.getTime() >= CONFIRM_FALLBACK_DAYS * DAY_MS;
       return (
         <div className="space-y-2 border-t border-stone-100 pt-3">
-          <p className="text-sm text-stone-700">
-            {o.dispatchedAt ? `Sent ${dateLabel(o.dispatchedAt)}, ${timeLabel(o.dispatchedAt)}. ` : ""}
-            Waiting for {first} to confirm they got it.
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-stone-700">
+              {o.dispatchedAt ? `Sent ${dateLabel(o.dispatchedAt)}, ${timeLabel(o.dispatchedAt)}. ` : ""}
+              Waiting for {first} to confirm they got it.
+            </p>
+            {o.boxes[0]?.qrCode && (
+              <Link href={`/seller/qr/${o.id}`} className={ui.buttonSecondary}>
+                QR label
+              </Link>
+            )}
+          </div>
           {overdue && (
             <form action={markDelivered} className="space-y-2">
               {hidden}

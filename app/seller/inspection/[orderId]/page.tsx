@@ -32,13 +32,31 @@ async function OrderInspection({ params }: { params: Promise<{ orderId: string }
     include: {
       customer: { select: { name: true } },
       batch: { select: { variety: { select: { name: true } }, orchard: { select: { name: true } } } },
-      boxes: { orderBy: { createdAt: "desc" }, take: 1, select: { aiDetections: true, aiCheckedAt: true } },
+      boxes: { orderBy: { createdAt: "desc" }, take: 1, select: { qrCode: true, aiDetections: true, aiCheckedAt: true } },
     },
   });
   if (!order) notFound();
 
-  const saved = parseStoredAi(order.boxes[0]?.aiDetections);
-  const checkedAt = order.boxes[0]?.aiCheckedAt;
+  const box = order.boxes[0];
+  const saved = parseStoredAi(box?.aiDetections);
+  const checkedAt = box?.aiCheckedAt;
+  {saved && box?.qrCode && (
+        <div className={`${ui.card} flex flex-wrap items-center justify-between gap-3 border-leaf/30 bg-leaf-soft/50`}>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-leaf">Box QR verification</p>
+            <p className="font-mono text-base font-bold text-ink">{box.qrCode}</p>
+            <p className="text-xs text-muted">Print or download this QR label and place it inside or on the box.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link href={`/seller/qr/${order.id}`} className={`${ui.button} py-2 text-sm`}>
+              Print / download QR
+            </Link>
+            <Link href={`/verify/${encodeURIComponent(box.qrCode)}`} className={ui.buttonSecondary}>
+              Preview scan page
+            </Link>
+          </div>
+        </div>
+      )}
   const checkable = order.status === "APPROVED" || order.status === "PACKED";
 
   return (

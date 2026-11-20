@@ -1,5 +1,6 @@
 "use server";
 
+import { makeBoxQrCode } from "@/lib/qr";
 import type { AiStatus, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
@@ -38,7 +39,7 @@ export async function prepareUpload(orderId: string, kind: MediaKind, size: numb
   }
 }
 
-export type SaveState = { ok: true } | { ok: false; error: string };
+export type SaveState = { ok: true; qrCode: string } | { ok: false; error: string };
 
 // Step 2: store the result on the order's box (FR-14/15). The browser's numbers are
 // checked and the summary is worked out again here; a disease is only a warning.
@@ -79,25 +80,30 @@ export async function saveInspection(orderId: string, kind: MediaKind, publicId:
   };
 
   const existing = await prisma.box.findFirst({
-    where: { orderId },
-    orderBy: { createdAt: "desc" },
-    select: { id: true, aiDetections: true },
-  });
-  if (existing) {
-    await prisma.box.update({ where: { id: existing.id }, data });
-    // A new check replaces the old one: its file isn't needed any more.
-    const old = parseStoredAi(existing.aiDetections)?.mediaPath;
-    const [oldKind, ...rest] = old?.split(":") ?? [];
-    const oldId = rest.join(":");
-    if (oldId && oldId !== publicId && isKind(oldKind)) await deleteMedia(oldId, oldKind).catch(() => {});
-  } else {
-    await prisma.box.create({ data: { ...data, qrCode: `AI-${orderId}`, orderId } });
-  }
+      where: { orderId },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, qrCode: true, aiDetections: true },
+    });
+    let qrCode: string;
+    if (existing) {
+      qrCode = existing.qrCode;
+      await prisma.box.update({ where: { id: existing.id }, data });
+      // A new check replaces the old one: its file isn't needed any more.
+      const old = parseStoredAi(existing.aiDetections)?.mediaPath;
+      const [oldKind, ...rest] = old?.split(":") ?? [];
+      const oldId = rest.join(":");
+      if (oldId && oldId !== publicId && isKind(oldKind)) await deleteMedia(oldId, oldKind).catch(() => {});
+    } else {
+      qrCode = makeBoxQrCode(orderId);
+      await prisma.box.create({ data: { ...data, qrCode, orderId } });
+    }
 
-  revalidatePath("/seller/inspection");
-  revalidatePath(`/seller/inspection/${orderId}`);
-  revalidatePath("/seller/orders");
-  revalidatePath(`/customer/orders/${orderId}`);
-  revalidatePath("/admin/reports");
-  return { ok: true };
+    revalidatePath("/seller/inspection");
+    revalidatePath(`/seller/inspection/${orderId}`);
+    revalidatePath("/seller/qr");
+    revalidatePath(`/seller/qr/${orderId}`);
+    revalidatePath("/seller/orders");
+    revalidatePath(`/customer/orders/${orderId}`);
+    revalidatePath("/admin/reports");
+    return { ok: true, qrCode };
 }

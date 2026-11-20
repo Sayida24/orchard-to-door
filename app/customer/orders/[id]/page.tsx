@@ -60,7 +60,7 @@ async function OrderStatusContent({
       deliveryArea: { select: { name: true } },
       review: true,
       complaints: { orderBy: { createdAt: "desc" } },
-      boxes: { where: { aiCheckedAt: { not: null } }, orderBy: { aiCheckedAt: "desc" }, take: 1, select: { aiDetections: true } },
+      boxes: { where: { aiCheckedAt: { not: null } }, orderBy: { aiCheckedAt: "desc" }, take: 1, select: { qrCode: true, aiDetections: true } },
     },
   });
   if (!order || order.customerId !== user.id) notFound();
@@ -203,9 +203,19 @@ async function OrderStatusContent({
 
       {aiCheck && (order.status === "PACKED" || order.status === "DISPATCHED" || order.status === "DELIVERED") && (
         <section className={`${card} space-y-3`} aria-labelledby="ai-check">
-          <h2 id="ai-check" className={h2}>
-            AI check of your box
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 id="ai-check" className={h2}>
+              AI check of your box
+            </h2>
+            {order.boxes[0]?.qrCode && (
+              <Link
+                href={`/verify/${encodeURIComponent(order.boxes[0].qrCode)}`}
+                className="rounded-full bg-leaf-soft px-3 py-1 font-mono text-xs font-bold text-leaf hover:bg-[#DCE8D9]"
+              >
+                QR: {order.boxes[0].qrCode}
+              </Link>
+            )}
+          </div>
           <p className="text-sm text-muted">
             {sellerFirst} recorded your box while packing it, and our AI looked at every mango.
           </p>
