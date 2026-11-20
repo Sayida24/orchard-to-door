@@ -12,10 +12,11 @@ import { APPROVAL_HOURS, approvalHoursLeft, CUSTOMER_CANCELLED, expireUnapproved
 import { prisma } from "@/lib/prisma";
 import { dateLabel, orderNumber, taka, timeLabel } from "@/lib/shop";
 import { ORDER_STATUS } from "../status";
+import { ReportPhotos } from "@/components/report-photos";
 import { CancelMyOrder, ConfirmDelivery, ReportForm, ReviewForm } from "./feedback-forms";
 
 const COMPLAINT_STATUS: Record<ComplaintStatus, { label: string; tone: string }> = {
-  OPEN: { label: "We're looking into it", tone: "bg-mango-soft text-mango-ink" },
+  OPEN: { label: "Waiting for the seller", tone: "bg-mango-soft text-mango-ink" },
   APPROVED: { label: "Approved", tone: "bg-green-100 text-green-900" },
   REJECTED: { label: "Not approved", tone: "bg-stone-200 text-stone-800" },
 };
@@ -60,7 +61,7 @@ async function OrderStatusContent({
       deliveryArea: { select: { name: true } },
       review: true,
       complaints: { orderBy: { createdAt: "desc" } },
-      boxes: { where: { aiCheckedAt: { not: null } }, orderBy: { aiCheckedAt: "desc" }, take: 1, select: { aiDetections: true } },
+      boxes: { where: { aiCheckedAt: { not: null } }, orderBy: { aiCheckedAt: "desc" }, take: 1, select: { qrCode: true, aiDetections: true } },
     },
   });
   if (!order || order.customerId !== user.id) notFound();
@@ -203,9 +204,19 @@ async function OrderStatusContent({
 
       {aiCheck && (order.status === "PACKED" || order.status === "DISPATCHED" || order.status === "DELIVERED") && (
         <section className={`${card} space-y-3`} aria-labelledby="ai-check">
-          <h2 id="ai-check" className={h2}>
-            AI check of your box
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 id="ai-check" className={h2}>
+              AI check of your box
+            </h2>
+            {order.boxes[0]?.qrCode && (
+              <Link
+                href={`/verify/${encodeURIComponent(order.boxes[0].qrCode)}`}
+                className="rounded-full bg-leaf-soft px-3 py-1 font-mono text-xs font-bold text-leaf hover:bg-[#DCE8D9]"
+              >
+                QR: {order.boxes[0].qrCode}
+              </Link>
+            )}
+          </div>
           <p className="text-sm text-muted">
             {sellerFirst} recorded your box while packing it, and our AI looked at every mango.
           </p>
@@ -299,7 +310,8 @@ async function OrderStatusContent({
                     </span>
                   </div>
                   <p className="text-sm text-ink">{c.message}</p>
-                  {c.adminNote && <p className="rounded-2xl bg-cream px-3 py-2 text-sm text-ink">Reply: {c.adminNote}</p>}
+                  <ReportPhotos urls={c.photoUrls} />
+                  {c.adminNote && <p className="rounded-2xl bg-cream px-3 py-2 text-sm text-ink">Seller&apos;s reply: {c.adminNote}</p>}
                   {c.status === "APPROVED" && c.completedAt && (
                     <p className="text-sm font-semibold text-green-800">
                       {c.resolution === "REFUND" ? "Money returned" : "New box sent"} {dateLabel(c.completedAt)}

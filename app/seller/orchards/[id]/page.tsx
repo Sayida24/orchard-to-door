@@ -61,9 +61,14 @@ async function SellerOrchard({
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold">{orchard.name}</h1>
-        <Link href={`/customer/orchards/${orchard.id}`} className={`${ui.link} text-sm`}>
-          See it as customers do
-        </Link>
+        <div className="flex flex-wrap items-center gap-4">
+          <Link href={`/seller/media?orchard=${orchard.id}`} className={`${ui.link} text-sm`}>
+            Orchard videos
+          </Link>
+          <Link href={`/customer/orchards/${orchard.id}`} className={`${ui.link} text-sm`}>
+            See it as customers do
+          </Link>
+        </div>
       </div>
 
       {/* Remounts after a new cover is saved, so the picked photo isn't uploaded twice */}

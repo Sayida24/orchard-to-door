@@ -9,7 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { CONFIRM_FALLBACK_DAYS, DAY_MS, dateLabel, orderNumber, taka, timeLabel } from "@/lib/shop";
 import { ui } from "@/lib/ui";
 import { approvalHoursLeft, expireUnapprovedOrders } from "@/lib/orders";
-import { approveOrder, completeReport, dispatchOrder, markDelivered, packOrder } from "./actions";
+import { approveOrder, dispatchOrder, markDelivered, packOrder } from "./actions";
 import { CancelOrder } from "./cancel-order";
 
 const TABS: { key: string; status: OrderStatus; label: string }[] = [
@@ -45,7 +45,9 @@ function loadOrders(sellerId: string, status: OrderStatus) {
       deliveryArea: { select: { name: true } },
       batch: { select: { variety: { select: { name: true } }, orchard: { select: { name: true } } } },
       review: { select: { rating: true, comment: true } },
-      complaints: { where: { status: "OPEN" }, select: { id: true } },
+      // Reports the seller still has to decide on or finish.
+      complaints: { where: { OR: [{ status: "OPEN" }, { status: "APPROVED", completedAt: null }] }, select: { id: true } },
+      boxes: { where: { aiCheckedAt: { not: null } }, orderBy: { aiCheckedAt: "desc" }, take: 1, select: { qrCode: true } },
     },
   });
 }
@@ -60,66 +62,25 @@ async function Orders({ searchParams }: { searchParams: Promise<Record<string, s
   const now = new Date();
   const mine = { batch: { sellerId: user.id } };
 
-  const [counts, todo, orders] = await Promise.all([
+  const [counts, reportsToDo, orders] = await Promise.all([
     prisma.order.groupBy({ by: ["status"], where: mine, _count: { _all: true } }),
-    prisma.complaint.findMany({
-      where: { status: "APPROVED", completedAt: null, order: mine },
-      orderBy: { resolvedAt: "asc" },
-      include: {
-        customer: { select: { name: true, phone: true } },
-        order: {
-          select: {
-            id: true,
-            quantityKg: true,
-            totalPrice: true,
-            address: true,
-            landmark: true,
-            deliveryArea: { select: { name: true } },
-            batch: { select: { variety: { select: { name: true } } } },
-          },
-        },
-      },
-    }),
+    prisma.complaint.count({ where: { OR: [{ status: "OPEN" }, { status: "APPROVED", completedAt: null }], order: mine } }),
     loadOrders(user.id, tab.status),
   ]);
   const countOf = (s: OrderStatus) => counts.find((c) => c.status === s)?._count._all ?? 0;
 
   return (
     <div className="space-y-5">
-      {todo.length > 0 && (
-        <section aria-labelledby="todo" className="space-y-3 rounded-2xl border-2 border-red-300 bg-red-50 p-4">
-          <h2 id="todo" className="font-bold text-red-900">
-            Approved by an admin: please finish ({todo.length})
-          </h2>
-          <ul className="space-y-2">
-            {todo.map((c) => {
-              const refund = c.resolution === "REFUND";
-              const o = c.order;
-              return (
-                <li key={c.id} className="space-y-2 rounded-xl bg-white p-3">
-                  <p className="font-semibold text-stone-900">
-                    {refund ? "Return the money" : "Send a new box"} · order #{orderNumber(o.id)}
-                  </p>
-                  <p className="text-sm text-stone-700">
-                    {o.quantityKg} kg {o.batch.variety.name} · paid {taka(o.totalPrice)} · {c.reason ?? "problem reported"}
-                  </p>
-                  <p className="text-sm text-stone-700">
-                    {c.customer.name} ·{" "}
-                    <a href={`tel:${c.customer.phone}`} className={ui.link}>
-                      {c.customer.phone}
-                    </a>
-                    {!refund && ` · ${o.address}${o.landmark ? ` (${o.landmark})` : ""}, ${o.deliveryArea?.name ?? ""}`}
-                  </p>
-                  {c.adminNote && <p className="text-sm text-stone-600">Admin&apos;s note: {c.adminNote}</p>}
-                  <form action={completeReport}>
-                    <input type="hidden" name="complaintId" value={c.id} />
-                    <SubmitButton pendingText="Saving…">{refund ? "Money returned" : "New box sent"}</SubmitButton>
-                  </form>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
+      {reportsToDo > 0 && (
+        <Link
+          href="/seller/reports"
+          className="flex items-center justify-between gap-3 rounded-2xl border-2 border-red-300 bg-red-50 p-4 font-bold text-red-900 hover:bg-red-100"
+        >
+          <span>
+            {reportsToDo} problem report{reportsToDo === 1 ? "" : "s"} to decide or finish
+          </span>
+          <span aria-hidden="true">→</span>
+        </Link>
       )}
 
       <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1" aria-label="Order steps">
@@ -201,7 +162,10 @@ function OrderCard({ o, now }: { o: Row; now: Date }) {
 
       {o.complaints.length > 0 && (
         <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
-          The customer reported a problem. An admin is looking at it.
+          The customer reported a problem.{" "}
+          <Link href="/seller/reports" className="underline underline-offset-2 hover:no-underline">
+            Open reports
+          </Link>
         </p>
       )}
 
@@ -240,6 +204,11 @@ function OrderActions({ o, now }: { o: Row; now: Date }) {
             <Link href={`/seller/inspection/${o.id}`} className={ui.buttonSecondary}>
               AI check
             </Link>
+            {o.boxes[0]?.qrCode && (
+              <Link href={`/seller/qr/${o.id}`} className={ui.buttonSecondary}>
+                QR label
+              </Link>
+            )}
             <form action={packOrder}>
               {hidden}
               <SubmitButton pendingText="Saving…">Mark packed</SubmitButton>
@@ -256,10 +225,17 @@ function OrderActions({ o, now }: { o: Row; now: Date }) {
     case "PACKED":
       return (
         <div className="space-y-1 border-t border-stone-100 pt-3">
-          <form action={dispatchOrder}>
-            {hidden}
-            <SubmitButton pendingText="Saving…">Mark dispatched</SubmitButton>
-          </form>
+          <div className="flex flex-wrap items-start gap-2">
+            <form action={dispatchOrder}>
+              {hidden}
+              <SubmitButton pendingText="Saving…">Mark dispatched</SubmitButton>
+            </form>
+            {o.boxes[0]?.qrCode && (
+              <Link href={`/seller/qr/${o.id}`} className={ui.buttonSecondary}>
+                QR label
+              </Link>
+            )}
+          </div>
           {o.packedAt && (
             <p className="text-xs text-stone-500">
               Packed {dateLabel(o.packedAt)}, {timeLabel(o.packedAt)}
@@ -271,10 +247,17 @@ function OrderActions({ o, now }: { o: Row; now: Date }) {
       const overdue = o.dispatchedAt !== null && now.getTime() - o.dispatchedAt.getTime() >= CONFIRM_FALLBACK_DAYS * DAY_MS;
       return (
         <div className="space-y-2 border-t border-stone-100 pt-3">
-          <p className="text-sm text-stone-700">
-            {o.dispatchedAt ? `Sent ${dateLabel(o.dispatchedAt)}, ${timeLabel(o.dispatchedAt)}. ` : ""}
-            Waiting for {first} to confirm they got it.
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-stone-700">
+              {o.dispatchedAt ? `Sent ${dateLabel(o.dispatchedAt)}, ${timeLabel(o.dispatchedAt)}. ` : ""}
+              Waiting for {first} to confirm they got it.
+            </p>
+            {o.boxes[0]?.qrCode && (
+              <Link href={`/seller/qr/${o.id}`} className={ui.buttonSecondary}>
+                QR label
+              </Link>
+            )}
+          </div>
           {overdue && (
             <form action={markDelivered} className="space-y-2">
               {hidden}

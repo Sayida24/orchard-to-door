@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { AiResultView } from "@/components/ai-result";
@@ -112,9 +113,12 @@ export function Inspector({ orderId }: { orderId: string }) {
   return (
     <div className="space-y-4 rounded-3xl border border-line bg-white p-5">
       {savedNote && (
-        <p role="status" className="rounded-2xl bg-leaf-soft px-4 py-3 text-sm font-semibold text-leaf">
-          Saved. The customer will see this check once you mark the order packed.
-        </p>
+        <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-leaf-soft px-4 py-3 text-sm font-semibold text-leaf">
+          <span>Saved. Your box QR code is ready, and the customer sees this check once packed.</span>
+          <Link href={`/seller/qr/${orderId}`} className="underline underline-offset-2 hover:text-leaf-dark">
+            Print or download QR label →
+          </Link>
+        </div>
       )}
 
       {(phase.name === "idle" || phase.name === "loading") && (

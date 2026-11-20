@@ -1,4 +1,3 @@
-
 import Image from "next/image";
 import Link from "next/link";
 import { ui } from "@/lib/ui";
@@ -77,6 +76,8 @@ export default function Home() {
             <Link href="/login" className={ui.buttonSecondary}>
               I have an account
             </Link>
+
+          
           </div>
 
           <p className="mt-5 text-sm text-stone-500">

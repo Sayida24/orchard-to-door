@@ -12,6 +12,8 @@ function revalidateOrder(orderId: string) {
   revalidatePath("/seller");
   revalidatePath("/seller/orders");
   revalidatePath("/seller/batches");
+  revalidatePath("/seller/qr");
+  revalidatePath(`/seller/qr/${orderId}`);
   revalidatePath("/customer/orders");
   revalidatePath(`/customer/orders/${orderId}`);
 }
@@ -58,7 +60,27 @@ export async function approveOrder(fd: FormData) {
 }
 
 export async function packOrder(fd: FormData) {
-  await advance(fd, "APPROVED", { status: "PACKED", packedAt: new Date() }, (n) => `Your order #${n} is packed. It will be on its way soon.`);
+  const user = await requireUser(["SELLER"]);
+  const id = str(fd, "orderId");
+  const where: Prisma.OrderWhereInput = { id, status: "APPROVED", batch: { sellerId: user.id } };
+  const order = await prisma.order.findFirst({ where, select: { customerId: true, totalPrice: true } });
+  if (!order) return;
+
+  const now = new Date();
+  const moved = await prisma.$transaction(async (tx) => {
+    const updated = await tx.order.updateMany({ where, data: { status: "PACKED", packedAt: now } });
+    if (updated.count === 0) return false;
+    await tx.box.updateMany({ where: { orderId: id, packedAt: null }, data: { packedAt: now } });
+    await tx.notification.create({
+      data: {
+        userId: order.customerId,
+        message: `Your order #${orderNumber(id)} is packed. It will be on its way soon.`,
+        link: `/customer/orders/${id}`,
+      },
+    });
+    return true;
+  });
+  if (moved) revalidateOrder(id);
 }
 
 export async function dispatchOrder(fd: FormData) {
@@ -104,32 +126,4 @@ export async function cancelOrder(fd: FormData) {
   revalidatePath(`/seller/batches/${batch.id}`);
   revalidatePath("/customer");
   revalidatePath(`/customer/orchards/${batch.orchardId}`);
-}
-
-// FR-25: after an admin approves a refund or a new box, the seller does it and ticks it off.
-export async function completeReport(fd: FormData) {
-  const user = await requireUser(["SELLER"]);
-  const id = str(fd, "complaintId");
-  const report = await prisma.complaint.findFirst({
-    where: { id, status: "APPROVED", completedAt: null, order: { batch: { sellerId: user.id } } },
-    select: { customerId: true, orderId: true, resolution: true },
-  });
-  if (!report) return;
-  const num = orderNumber(report.orderId);
-
-  await prisma.$transaction(async (tx) => {
-    const updated = await tx.complaint.updateMany({ where: { id, completedAt: null }, data: { completedAt: new Date() } });
-    if (updated.count === 0) return;
-    await tx.notification.create({
-      data: {
-        userId: report.customerId,
-        message:
-          report.resolution === "REFUND"
-            ? `The seller has returned your money for order #${num}.`
-            : `The seller has sent you a new box for order #${num}.`,
-        link: `/customer/orders/${report.orderId}`,
-      },
-    });
-  });
-  revalidateOrder(report.orderId);
 }

@@ -5,18 +5,21 @@ import { useEffect, useState } from "react";
 
 const MAX_SIDE = 1600; // px; plenty for a full-width cover on a phone or laptop
 
-/** Shrinks a photo in the browser to a JPEG of at most 1600 px, usually a few hundred KB. */
-async function shrink(file: File): Promise<Blob> {
+/** Shrinks a photo in the browser to a JPEG of at most `maxSide` px, usually a few hundred KB. */
+export async function shrinkPhoto(file: File, maxSide = MAX_SIDE): Promise<Blob> {
   const bitmap = await createImageBitmap(file); // also applies the phone's rotation
-  const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(bitmap.width * scale);
   canvas.height = Math.round(bitmap.height * scale);
   canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   bitmap.close();
-  return new Promise((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Could not read the photo"))), "image/jpeg", 0.82),
-  );
+  const jpeg = (quality: number) =>
+    new Promise<Blob>((resolve, reject) =>
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Could not read the photo"))), "image/jpeg", quality),
+    );
+  const blob = await jpeg(0.82);
+  return blob.size > 900 * 1024 ? jpeg(0.6) : blob; // a very detailed photo: squeeze it a bit more
 }
 
 const size = (bytes: number) =>
@@ -55,7 +58,7 @@ export function PhotoPicker({
     }
     setBusy(true);
     try {
-      const small = await shrink(file);
+      const small = await shrinkPhoto(file);
       setPreview(URL.createObjectURL(small));
       setNote({ text: `Ready: ${size(file.size)} photo shrunk to ${size(small.size)}.` });
       onChange(small);

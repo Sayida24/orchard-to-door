@@ -4,7 +4,33 @@ import type { Prisma } from "@prisma/client";
 
 export const GIFT_BOX_FEE = 120; // taka, added once per order
 export const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
 const DHAKA_OFFSET_MS = 6 * 60 * 60 * 1000; // Bangladesh is UTC+6 all year
+
+/** Sellers must remove uploaded orchard videos within 3 days. */
+export const ORCHARD_VIDEO_MAX_DAYS = 3;
+export const ORCHARD_VIDEO_MAX_MS = ORCHARD_VIDEO_MAX_DAYS * DAY_MS;
+
+export const videoExpiresAt = (recordedAt: Date) => new Date(recordedAt.getTime() + ORCHARD_VIDEO_MAX_MS);
+export const videoCutoffDate = (now: Date) => new Date(now.getTime() - ORCHARD_VIDEO_MAX_MS);
+
+export function videoRemainingLabel(recordedAt: Date, now: Date) {
+  const diff = videoExpiresAt(recordedAt).getTime() - now.getTime();
+  if (diff <= 0) {
+    const overHours = Math.max(1, Math.floor(Math.abs(diff) / HOUR_MS));
+    const days = Math.floor(overHours / 24);
+    const hours = overHours % 24;
+    const span = days > 0 ? `${days}d ${hours}h` : `${overHours}h`;
+    return { overdue: true, urgent: true, label: `Overdue by ${span} — remove now` };
+  }
+  const totalHours = Math.max(1, Math.ceil(diff / HOUR_MS));
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+  if (totalHours <= 24) {
+    return { overdue: false, urgent: true, label: `Remove within ${totalHours}h` };
+  }
+  return { overdue: false, urgent: false, label: `${days}d ${hours}h left to remove` };
+}
 
 /** A batch customers can order from: open, stock left, not past its closing date (FR-08). */
 export function openBatchWhere(now: Date): Prisma.BatchWhereInput {
@@ -95,3 +121,5 @@ export const COMPLAINT_REASONS = [
   "Late delivery",
   "Something else",
 ];
+/** A customer can attach this many photos to a problem report. */
+export const MAX_REPORT_PHOTOS = 2;

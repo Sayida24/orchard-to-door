@@ -73,6 +73,26 @@ export async function mediaExists(publicId: string, kind: MediaKind) {
   return true;
 }
 
+/** Thumbnail frame for an uploaded video (first frame, compressed JPEG). */
+export function videoPosterUrl(publicId: string) {
+  const { cloud } = config();
+  return `https://res.cloudinary.com/${cloud}/video/upload/so_0,q_auto,f_jpg/${publicId}.jpg`;
+}
+
+/** Extracts the Cloudinary publicId from a video URL stored by mediaUrl(), or null for external/sample files. */
+export function publicIdFromVideoUrl(url: string) {
+  const cloud = process.env.CLOUDINARY_CLOUD_NAME;
+  if (!cloud) return null;
+  const marker = `https://res.cloudinary.com/${cloud}/video/upload/`;
+  if (!url.startsWith(marker)) return null;
+  const rest = url.slice(marker.length);
+  const parts = rest.split("/");
+  if (parts.length < 2) return null;
+  // Drop the transformation segment (e.g. "q_auto") and file extension (e.g. ".mp4")
+  const joined = parts.slice(1).join("/");
+  return joined.replace(/\.[^./]+$/, "") || null;
+}
+
 export async function deleteMedia(publicId: string, kind: MediaKind) {
   const { cloud, key, secret } = config();
   const params = { invalidate: "true", public_id: publicId, timestamp: now() };

@@ -8,7 +8,6 @@ import { Stars } from "@/components/stars";
 import { expireUnapprovedOrders } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
 import {
-  DAY_MS,
   dateLabel,
   dayLabel,
   dhakaDayStart,
@@ -18,6 +17,7 @@ import {
   taka,
   timeLabel,
   varietyColor,
+  videoCutoffDate,
 } from "@/lib/shop";
 import { HarvestVideos, type VideoItem } from "./harvest-videos";
 
@@ -43,7 +43,7 @@ async function OrchardDetail({ params }: { params: Promise<{ id: string }> }) {
   await expireUnapprovedOrders(); // kg held by orders nobody approved in 24 hours go back on sale
   const now = new Date();
   const today = dhakaDayStart(now);
-  const weekAgo = new Date(today.getTime() - 6 * DAY_MS);
+  const videoCutoff = videoCutoffDate(now);
 
   const [orchard, ratings] = await Promise.all([
     prisma.orchard.findUnique({
@@ -51,7 +51,7 @@ async function OrchardDetail({ params }: { params: Promise<{ id: string }> }) {
       include: {
         seller: { select: { name: true } },
         batches: { where: openBatchWhere(now), orderBy: { harvestDate: "desc" }, include: { variety: true } },
-        videos: { where: { recordedAt: { gte: weekAgo } }, orderBy: { recordedAt: "desc" } },
+        videos: { where: { recordedAt: { gte: videoCutoff } }, orderBy: { recordedAt: "desc" } },
         reviews: {
           orderBy: { createdAt: "desc" },
           take: 5,
@@ -157,7 +157,7 @@ async function OrchardDetail({ params }: { params: Promise<{ id: string }> }) {
           {earlier.length > 0 && (
             <details className="group rounded-[20px] border border-line bg-white">
               <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-4 font-semibold text-ink">
-                Earlier this week ({earlier.length})
+                Earlier (last 3 days) ({earlier.length})
                 <svg aria-hidden="true" className="h-5 w-5 transition group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="m9 18 6-6-6-6" />
                 </svg>

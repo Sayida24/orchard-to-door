@@ -47,8 +47,8 @@ async function Overview() {
       href: "/admin/reports",
       title: "Problem reports",
       value: openReports,
-      note: openReports ? "need a decision" : "all decided",
-      alert: openReports > 0,
+      note: openReports ? "waiting for sellers" : "all decided",
+      alert: false, // sellers decide; the admin only looks
     },
     {
       href: "/admin/orchards",

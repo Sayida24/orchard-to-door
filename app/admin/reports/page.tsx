@@ -2,19 +2,24 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import type { Prisma } from "@prisma/client";
+import { ReportPhotos } from "@/components/report-photos";
 import { requireUser } from "@/lib/auth";
 import { parseStoredAi, summaryLine } from "@/lib/inspection";
 import { prisma } from "@/lib/prisma";
 import { NO_QUALITY_DATA, orchardQuality } from "@/lib/quality";
-import { dateLabel, orderNumber, taka, timeLabel } from "@/lib/shop";
+import { DAY_MS, dateLabel, orderNumber, taka, timeLabel } from "@/lib/shop";
 import { ui } from "@/lib/ui";
-import { DecideForm } from "./decide-form";
 
-const RESOLVED_LABEL = { REFUND: "Refund", REPLACEMENT: "Replacement" } as const;
+const RESOLVED_LABEL = { REFUND: "Refund", REPLACEMENT: "New box" } as const;
 const firstName = (name: string) => name.split(" ")[0];
+const daysText = (ms: number) => {
+  const days = Math.floor(ms / DAY_MS);
+  return days < 1 ? "within a day" : `${days} day${days === 1 ? "" : "s"}`;
+};
 
-// FR-21 / FR-25: customers' problem reports. The admin sees what was bought and from which
-// orchard, but not the customer's address or phone: those stay with the seller.
+// FR-21 / FR-25: customers' problem reports, for oversight. Each seller decides on reports
+// about their own orders; the admin sees every report, its photos and the seller's decision,
+// but not the customer's address or phone: those stay with the seller.
 export default function ReportsPage({ searchParams }: PageProps<"/admin/reports">) {
   return (
     <main>
@@ -29,6 +34,7 @@ export default function ReportsPage({ searchParams }: PageProps<"/admin/reports"
 async function Reports({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requireUser(["ADMIN"]);
   await connection();
+  const now = new Date();
   const sp = await searchParams;
   const decided = sp.show === "decided";
   const orchardId = typeof sp.orchard === "string" && sp.orchard ? sp.orchard : undefined;
@@ -70,7 +76,7 @@ async function Reports({ searchParams }: { searchParams: Promise<Record<string, 
         },
       },
     }),
-    orchardQuality(new Date()),
+    orchardQuality(now),
   ]);
 
   const orchardChips = selected && !withReports.some((o) => o.id === selected.id) ? [...withReports, selected] : withReports;
@@ -90,7 +96,7 @@ async function Reports({ searchParams }: { searchParams: Promise<Record<string, 
     <div className="space-y-4">
       <div className="flex gap-2">
         <Link href={href(false, orchardId)} className={chip(!decided)}>
-          Open ({openCount})
+          Waiting for seller ({openCount})
         </Link>
         <Link href={href(true, orchardId)} className={chip(decided)}>
           Decided
@@ -112,7 +118,7 @@ async function Reports({ searchParams }: { searchParams: Promise<Record<string, 
 
       {reports.length === 0 ? (
         <p className={`${ui.card} text-stone-600`}>
-          {decided ? "No decided reports here yet." : "No open reports here. Nothing needs a decision."}
+          {decided ? "No decided reports here yet." : "No reports are waiting for a seller."}
         </p>
       ) : (
         <ul className="space-y-3">
@@ -142,6 +148,7 @@ async function Reports({ searchParams }: { searchParams: Promise<Record<string, 
                 </div>
 
                 <p className="rounded-xl bg-stone-50 px-3 py-2 text-stone-800">{r.message}</p>
+                <ReportPhotos urls={r.photoUrls} />
 
                 <dl className="grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">
                   <div>
@@ -194,14 +201,28 @@ async function Reports({ searchParams }: { searchParams: Promise<Record<string, 
                   </div>
                 </dl>
 
-                {r.status === "OPEN" ? (
-                  <DecideForm id={r.id} />
-                ) : (
-                  <p className="border-t border-stone-100 pt-3 text-sm text-stone-600">
-                    {r.adminNote ? `Note: ${r.adminNote}. ` : ""}
-                    {r.resolvedAt ? `Decided ${dateLabel(r.resolvedAt)}.` : ""}
-                  </p>
-                )}
+                <div className="space-y-1 border-t border-stone-100 pt-3 text-sm text-stone-700">
+                  {r.status === "OPEN" ? (
+                    <p className="font-semibold text-amber-900">
+                      Waiting for {firstName(o.batch.seller.name)} to decide · reported {daysText(now.getTime() - r.createdAt.getTime())} ago
+                    </p>
+                  ) : (
+                    <>
+                      <p>
+                        <span className="font-semibold text-stone-900">{firstName(o.batch.seller.name)}&apos;s decision</span>
+                        {r.resolvedAt ? `, ${dateLabel(r.resolvedAt)} (took ${daysText(r.resolvedAt.getTime() - r.createdAt.getTime())})` : ""}
+                        {r.adminNote ? `: “${r.adminNote}”` : ""}
+                      </p>
+                      {r.status === "APPROVED" && (
+                        <p className={r.completedAt ? "text-green-800" : "font-semibold text-amber-900"}>
+                          {r.completedAt
+                            ? `${r.resolution === "REFUND" ? "Money returned" : "New box sent"} ${dateLabel(r.completedAt)}`
+                            : `${r.resolution === "REFUND" ? "Refund" : "New box"} not done yet`}
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
               </li>
             );
           })}

@@ -10,7 +10,7 @@ const pill =
 // The logo renders instantly; the user menu reads the session, so it streams in.
 export function SiteHeader() {
   return (
-    <header className="relative z-20 w-full border-b border-line/70 bg-cream/95 backdrop-blur">
+    <header className="relative z-20 w-full border-b border-line/70 bg-cream/95 backdrop-blur print:hidden">
       <div className="mx-auto flex h-[68px] w-full max-w-5xl items-center justify-between gap-3 px-4">
         <Link href="/" className="font-display text-[26px] font-bold tracking-tight text-leaf">
           Orchiva

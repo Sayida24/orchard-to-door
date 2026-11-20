@@ -2,8 +2,10 @@ import { prisma } from "@/lib/prisma";
 import { DAY_MS } from "@/lib/shop";
 
 // An orchard "needs attention" when either rule below is met. Change the numbers here.
-export const FLAG_APPROVED_REPORTS = 3; // approved problem reports…
-export const FLAG_WINDOW_DAYS = 30; // …about orders reported within this many days
+// Sellers decide on reports about their own orders, so every report counts here, whatever
+// the seller decided: rejecting reports can't hide an orchard's problems.
+export const FLAG_REPORTS = 3; // problem reports…
+export const FLAG_WINDOW_DAYS = 30; // …made within this many days
 export const FLAG_RATING_BELOW = 3; // or an average rating below this many stars
 
 export type OrchardQuality = {
@@ -12,7 +14,7 @@ export type OrchardQuality = {
   open: number;
   approved: number;
   rejected: number;
-  recentApproved: number; // approved reports made within FLAG_WINDOW_DAYS
+  recent: number; // reports made within FLAG_WINDOW_DAYS, whatever was decided
   reasons: [string, number][]; // most common first
   flagged: boolean;
 };
@@ -23,7 +25,7 @@ export const NO_QUALITY_DATA: OrchardQuality = {
   open: 0,
   approved: 0,
   rejected: 0,
-  recentApproved: 0,
+  recent: 0,
   reasons: [],
   flagged: false,
 };
@@ -63,10 +65,8 @@ export async function orchardQuality(now: Date, orchardId?: string): Promise<Map
     const q = entry(c.order.batch.orchardId);
     if (c.status === "OPEN") q.open++;
     else if (c.status === "REJECTED") q.rejected++;
-    else {
-      q.approved++;
-      if (c.createdAt >= since) q.recentApproved++;
-    }
+    else q.approved++;
+    if (c.createdAt >= since) q.recent++;
     const reason = c.reason ?? "Something else";
     q.reasonCounts.set(reason, (q.reasonCounts.get(reason) ?? 0) + 1);
   }
@@ -74,7 +74,7 @@ export async function orchardQuality(now: Date, orchardId?: string): Promise<Map
   const result = new Map<string, OrchardQuality>();
   for (const [id, { reasonCounts, ...q }] of map) {
     q.reasons = [...reasonCounts].sort((a, b) => b[1] - a[1]);
-    q.flagged = q.recentApproved >= FLAG_APPROVED_REPORTS || (q.rating !== null && q.rating < FLAG_RATING_BELOW);
+    q.flagged = q.recent >= FLAG_REPORTS || (q.rating !== null && q.rating < FLAG_RATING_BELOW);
     result.set(id, q);
   }
   return result;
@@ -82,8 +82,8 @@ export async function orchardQuality(now: Date, orchardId?: string): Promise<Map
 
 /** Why an orchard is flagged, in one line. */
 export function flagReason(q: OrchardQuality) {
-  if (q.recentApproved >= FLAG_APPROVED_REPORTS) {
-    return `${q.recentApproved} approved problem reports in the last ${FLAG_WINDOW_DAYS} days`;
+  if (q.recent >= FLAG_REPORTS) {
+    return `${q.recent} problem reports in the last ${FLAG_WINDOW_DAYS} days`;
   }
   return q.rating !== null ? `Average rating ${q.rating.toFixed(1)}★, below ${FLAG_RATING_BELOW}★` : "";
 }
