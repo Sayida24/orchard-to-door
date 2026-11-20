@@ -127,31 +127,3 @@ export async function cancelOrder(fd: FormData) {
   revalidatePath("/customer");
   revalidatePath(`/customer/orchards/${batch.orchardId}`);
 }
-
-// FR-25: after an admin approves a refund or a new box, the seller does it and ticks it off.
-export async function completeReport(fd: FormData) {
-  const user = await requireUser(["SELLER"]);
-  const id = str(fd, "complaintId");
-  const report = await prisma.complaint.findFirst({
-    where: { id, status: "APPROVED", completedAt: null, order: { batch: { sellerId: user.id } } },
-    select: { customerId: true, orderId: true, resolution: true },
-  });
-  if (!report) return;
-  const num = orderNumber(report.orderId);
-
-  await prisma.$transaction(async (tx) => {
-    const updated = await tx.complaint.updateMany({ where: { id, completedAt: null }, data: { completedAt: new Date() } });
-    if (updated.count === 0) return;
-    await tx.notification.create({
-      data: {
-        userId: report.customerId,
-        message:
-          report.resolution === "REFUND"
-            ? `The seller has returned your money for order #${num}.`
-            : `The seller has sent you a new box for order #${num}.`,
-        link: `/customer/orders/${report.orderId}`,
-      },
-    });
-  });
-  revalidateOrder(report.orderId);
-}

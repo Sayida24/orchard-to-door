@@ -121,3 +121,5 @@ export const COMPLAINT_REASONS = [
   "Late delivery",
   "Something else",
 ];
+/** A customer can attach this many photos to a problem report. */
+export const MAX_REPORT_PHOTOS = 2;

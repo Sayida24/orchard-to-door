@@ -6,10 +6,11 @@ import { decideReport, type DecideState } from "./actions";
 
 const OPTIONS = [
   { value: "REFUND", label: "Refund", tone: "border-green-600 bg-green-50" },
-  { value: "REPLACEMENT", label: "Replacement", tone: "border-green-600 bg-green-50" },
+  { value: "REPLACEMENT", label: "Send new box", tone: "border-green-600 bg-green-50" },
   { value: "REJECT", label: "Not approved", tone: "border-stone-600 bg-stone-100" },
 ];
 
+// The seller's decision on a problem report about one of their orders.
 export function DecideForm({ id }: { id: string }) {
   // Controlled, because React 19 resets a form after each action and we keep input on errors.
   const [decision, setDecision] = useState("");
@@ -33,7 +34,7 @@ export function DecideForm({ id }: { id: string }) {
           {OPTIONS.map((o) => (
             <label
               key={o.value}
-              className={`flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 px-2 text-center text-sm font-semibold text-stone-900 ${
+              className={`flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 px-2 text-center text-sm font-semibold text-stone-900 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-lime-700 ${
                 decision === o.value ? o.tone : "border-stone-200 hover:border-stone-400"
               }`}
             >
@@ -63,7 +64,11 @@ export function DecideForm({ id }: { id: string }) {
           maxLength={500}
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder={decision === "REJECT" ? "e.g. The photos show the box arrived intact." : "e.g. A fresh 3 kg box goes out tomorrow."}
+          placeholder={
+            decision === "REJECT"
+              ? "e.g. The photos show the mangoes are only ripe, not spoiled."
+              : "e.g. A fresh 3 kg box goes out tomorrow."
+          }
           className={ui.input}
         />
       </div>

@@ -9,6 +9,7 @@ const links = [
   { href: "/seller/orchards", label: "My orchards" },
   { href: "/seller/batches", label: "Harvest batches" },
   { href: "/seller/orders", label: "Orders & packing" },
+  { href: "/seller/reports", label: "Reports" },
   { href: "/seller/inspection", label: "AI inspection" },
   { href: "/seller/qr", label: "QR verification" },
   { href: "/seller/media", label: "Orchard media" },

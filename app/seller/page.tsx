@@ -36,7 +36,9 @@ async function Overview() {
       select: { id: true, name: true, isActive: true },
     }),
     prisma.order.groupBy({ by: ["status"], where: mine, _count: { _all: true } }),
-    prisma.complaint.count({ where: { status: "APPROVED", completedAt: null, order: mine } }),
+    prisma.complaint.count({
+      where: { OR: [{ status: "OPEN" }, { status: "APPROVED", completedAt: null }], order: mine },
+    }),
     prisma.batch.findMany({ where: { sellerId: user.id, ...openBatchWhere(now) }, select: { availableKg: true } }),
     prisma.order.aggregate({
       where: { ...mine, status: "DELIVERED", deliveredAt: { gte: weekAgo } },
@@ -66,10 +68,10 @@ async function Overview() {
     { href: "/seller/orders?show=packed", title: "To dispatch", value: count("PACKED"), note: "packed, not sent", alert: false },
     { href: "/seller/orders?show=dispatched", title: "On the way", value: count("DISPATCHED"), note: "with customers soon", alert: false },
     {
-      href: "/seller/orders",
-      title: "Refunds & new boxes",
+      href: "/seller/reports",
+      title: "Problem reports",
       value: toFinish,
-      note: toFinish ? "approved, still to do" : "nothing to do",
+      note: toFinish ? "to decide or finish" : "nothing to do",
       alert: toFinish > 0,
     },
   ];
