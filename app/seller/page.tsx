@@ -4,9 +4,10 @@ import { Suspense } from "react";
 import type { OrderStatus } from "@prisma/client";
 import { Stars } from "@/components/stars";
 import { requireUser } from "@/lib/auth";
+import { syncOrchardVideoWarnings } from "@/lib/orchard-videos";
 import { expireUnapprovedOrders } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
-import { DAY_MS, dateLabel, openBatchWhere, ORCHARD_VIDEO_MAX_DAYS, taka, timeLabel, videoCutoffDate } from "@/lib/shop";
+import { DAY_MS, dateLabel, openBatchWhere, taka, timeLabel } from "@/lib/shop";
 import { ui } from "@/lib/ui";
 
 export default function SellerHome() {
@@ -25,20 +26,19 @@ async function Overview() {
   const user = await requireUser(["SELLER"]);
   await connection();
   await expireUnapprovedOrders();
+  const videoWarnings = await syncOrchardVideoWarnings(user.id);
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * DAY_MS);
   const mine = { batch: { sellerId: user.id } };
 
-  const [orchards, byStatus, toFinish, onSale, week, ratings, notes, overdueVideos] = await Promise.all([
+  const [orchards, byStatus, toFinish, onSale, week, ratings, notes] = await Promise.all([
     prisma.orchard.findMany({
       where: { sellerId: user.id },
       orderBy: { name: "asc" },
       select: { id: true, name: true, isActive: true },
     }),
     prisma.order.groupBy({ by: ["status"], where: mine, _count: { _all: true } }),
-    prisma.complaint.count({
-      where: { OR: [{ status: "OPEN" }, { status: "APPROVED", completedAt: null }], order: mine },
-    }),
+    prisma.complaint.count({ where: { status: "APPROVED", completedAt: null, order: mine } }),
     prisma.batch.findMany({ where: { sellerId: user.id, ...openBatchWhere(now) }, select: { availableKg: true } }),
     prisma.order.aggregate({
       where: { ...mine, status: "DELIVERED", deliveredAt: { gte: weekAgo } },
@@ -47,9 +47,6 @@ async function Overview() {
     }),
     prisma.review.aggregate({ where: { orchard: { sellerId: user.id } }, _avg: { rating: true }, _count: { _all: true } }),
     prisma.notification.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" }, take: 5 }),
-    prisma.harvestVideo.count({
-      where: { orchard: { sellerId: user.id }, recordedAt: { lt: videoCutoffDate(now) } },
-    }),
   ]);
 
   const count = (s: OrderStatus) => byStatus.find((b) => b.status === s)?._count._all ?? 0;
@@ -68,10 +65,10 @@ async function Overview() {
     { href: "/seller/orders?show=packed", title: "To dispatch", value: count("PACKED"), note: "packed, not sent", alert: false },
     { href: "/seller/orders?show=dispatched", title: "On the way", value: count("DISPATCHED"), note: "with customers soon", alert: false },
     {
-      href: "/seller/reports",
-      title: "Problem reports",
+      href: "/seller/orders",
+      title: "Refunds & new boxes",
       value: toFinish,
-      note: toFinish ? "to decide or finish" : "nothing to do",
+      note: toFinish ? "approved, still to do" : "nothing to do",
       alert: toFinish > 0,
     },
   ];
@@ -99,20 +96,21 @@ async function Overview() {
           An admin paused {o.name}. Customers can&apos;t order from it until it&apos;s resumed. Orders already placed carry on.
         </p>
       ))}
-      {overdueVideos > 0 && (
+      {videoWarnings.map((w) => (
         <div
-          role="alert"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900"
+          key={w.orchardId}
+          role="status"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
         >
-          <p className="font-semibold">
-            {overdueVideos} orchard {overdueVideos === 1 ? "video is" : "videos are"} past the{" "}
-            {ORCHARD_VIDEO_MAX_DAYS}-day removal limit.
-          </p>
-          <Link href="/seller/media" className="font-bold text-red-800 underline underline-offset-2 hover:text-red-950">
-            Remove in Orchard media →
+          <span>
+            <strong>{w.orchardName}</strong> has {w.count} videos and the oldest is over 1 month old. Please remove old
+            videos when you can (you can still upload new ones).
+          </span>
+          <Link href={`/seller/media?orchard=${w.orchardId}`} className="font-semibold underline underline-offset-2">
+            Manage videos →
           </Link>
         </div>
-      )}
+      ))}
 
       <ul className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         {cards.map((c) => (

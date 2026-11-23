@@ -272,3 +272,10 @@ export async function inspectPhoto(file: File, onProgress: (p: Progress) => void
     frames: [{ t: 0, b }],
   };
 }
+
+/** Runs a single AI pass on a live camera video or canvas, returning normalized boxes. */
+export async function detectFrame(source: CanvasImageSource, w: number, h: number): Promise<AiBox[]> {
+  if (w <= 0 || h <= 0) return [];
+  const dets = await detect(source, w, h);
+  return dets.map(toBox);
+}

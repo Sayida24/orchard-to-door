@@ -4,33 +4,7 @@ import type { Prisma } from "@prisma/client";
 
 export const GIFT_BOX_FEE = 120; // taka, added once per order
 export const DAY_MS = 24 * 60 * 60 * 1000;
-const HOUR_MS = 60 * 60 * 1000;
 const DHAKA_OFFSET_MS = 6 * 60 * 60 * 1000; // Bangladesh is UTC+6 all year
-
-/** Sellers must remove uploaded orchard videos within 3 days. */
-export const ORCHARD_VIDEO_MAX_DAYS = 3;
-export const ORCHARD_VIDEO_MAX_MS = ORCHARD_VIDEO_MAX_DAYS * DAY_MS;
-
-export const videoExpiresAt = (recordedAt: Date) => new Date(recordedAt.getTime() + ORCHARD_VIDEO_MAX_MS);
-export const videoCutoffDate = (now: Date) => new Date(now.getTime() - ORCHARD_VIDEO_MAX_MS);
-
-export function videoRemainingLabel(recordedAt: Date, now: Date) {
-  const diff = videoExpiresAt(recordedAt).getTime() - now.getTime();
-  if (diff <= 0) {
-    const overHours = Math.max(1, Math.floor(Math.abs(diff) / HOUR_MS));
-    const days = Math.floor(overHours / 24);
-    const hours = overHours % 24;
-    const span = days > 0 ? `${days}d ${hours}h` : `${overHours}h`;
-    return { overdue: true, urgent: true, label: `Overdue by ${span} — remove now` };
-  }
-  const totalHours = Math.max(1, Math.ceil(diff / HOUR_MS));
-  const days = Math.floor(totalHours / 24);
-  const hours = totalHours % 24;
-  if (totalHours <= 24) {
-    return { overdue: false, urgent: true, label: `Remove within ${totalHours}h` };
-  }
-  return { overdue: false, urgent: false, label: `${days}d ${hours}h left to remove` };
-}
 
 /** A batch customers can order from: open, stock left, not past its closing date (FR-08). */
 export function openBatchWhere(now: Date): Prisma.BatchWhereInput {
@@ -76,6 +50,25 @@ export const mangoEstimate = (kg: number) => `${kg * 2}–${Math.round(kg * 2.4)
 export function durationLabel(sec: number | null) {
   if (!sec) return "";
   return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+}
+
+/** Max videos per orchard before 1 month, and age (days) when a cleanup warning is sent. */
+export const ORCHARD_VIDEO_LIMIT = 7;
+export const ORCHARD_VIDEO_WARN_DAYS = 30;
+
+export function orchardVideoStatus(count: number, oldestRecordedAt: Date | null, now = new Date()) {
+  const atLimit = count >= ORCHARD_VIDEO_LIMIT;
+  const oldestAgeDays = oldestRecordedAt
+    ? Math.floor((now.getTime() - oldestRecordedAt.getTime()) / DAY_MS)
+    : 0;
+  const hasMonthOldVideo = oldestRecordedAt !== null && oldestAgeDays >= ORCHARD_VIDEO_WARN_DAYS;
+  return {
+    atLimit,
+    oldestAgeDays,
+    hasMonthOldVideo,
+    needsCleanupWarning: atLimit && hasMonthOldVideo,
+    canUpload: !atLimit || hasMonthOldVideo,
+  };
 }
 
 export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
