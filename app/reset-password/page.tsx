@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { findValidToken } from "@/lib/password-reset";
 import { ui } from "@/lib/ui";
-import { ExpiredNotice, ResetForm } from "./reset-form";
+import { ExpiredNotice, ResetForm, SupabaseReset } from "./reset-form";
 
 export const metadata: Metadata = {
   title: "Choose a new password · Orchiva",
@@ -27,6 +27,8 @@ export default function ResetPasswordPage({ searchParams }: PageProps<"/reset-pa
 async function ResetContent({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { token } = await searchParams;
   const value = typeof token === "string" ? token : "";
+  // No ?token= means the link came from a Supabase Auth email (its key is after "#").
+  if (!value) return <SupabaseReset />;
   const row = await findValidToken(value);
   if (!row) return <ExpiredNotice />;
   return <ResetForm token={value} name={row.user.name.split(" ")[0]} />;

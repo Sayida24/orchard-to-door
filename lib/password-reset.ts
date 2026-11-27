@@ -7,8 +7,12 @@ export const MAX_REQUESTS_PER_HOUR = 3;
 
 const hash = (token: string) => createHash("sha256").update(token).digest("hex");
 
-function appUrl() {
-  return (process.env.NEXTAUTH_URL ?? "http://localhost:3000").replace(/\/$/, "");
+// The site address used in reset links. Never taken from the request's Host header:
+// an attacker could fake it and receive someone else's reset link.
+export function appUrl() {
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL; // set by Vercel, e.g. orchard-to-door.vercel.app
+  const url = process.env.NEXTAUTH_URL || (vercel ? `https://${vercel}` : "http://localhost:3000");
+  return url.replace(/\/$/, "");
 }
 
 /**

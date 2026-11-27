@@ -2,12 +2,14 @@
 
 import { sendMail } from "@/lib/mail";
 import {
+  appUrl,
   createResetLink,
   MAX_REQUESTS_PER_HOUR,
   recentRequestCount,
   SELF_SERVICE_TTL_MS,
 } from "@/lib/password-reset";
 import { prisma } from "@/lib/prisma";
+import { sendSupabaseResetEmail } from "@/lib/supabase-auth";
 import { normalizePhone } from "@/lib/validation";
 
 export type ForgotState = { done?: boolean; error?: string; identifier?: string } | undefined;
@@ -22,8 +24,13 @@ export async function requestPasswordReset(_prev: ForgotState, fd: FormData): Pr
     where: identifier.includes("@") ? { email: identifier.toLowerCase() } : { phone: normalizePhone(identifier) },
     select: { id: true, name: true, email: true },
   });
+  if (!user?.email) return { done: true };
 
-  if (user?.email && (await recentRequestCount(user.id)) < MAX_REQUESTS_PER_HOUR) {
+  // Supabase Auth sends the email. If it can't (not set up, or its hourly email limit
+  // is reached), Orchiva sends its own one-time link through Gmail instead.
+  if (await sendSupabaseResetEmail(user.email, `${appUrl()}/reset-password`)) return { done: true };
+
+  if ((await recentRequestCount(user.id)) < MAX_REQUESTS_PER_HOUR) {
     const { url } = await createResetLink(user.id, SELF_SERVICE_TTL_MS);
     const first = user.name.split(" ")[0];
     try {

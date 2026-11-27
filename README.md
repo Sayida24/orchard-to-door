@@ -24,9 +24,9 @@ Orchiva is an online mango shop that connects customers in Bangladesh directly w
 - List harvest batches: variety (or a new one), price per kg, kg available, harvest date, and 2, 3 or 5 days on sale. Change the price, update stock or stop selling at any time.
 - Approve or decline new orders within 24 hours. The ordered kg are held straight away, and orders nobody approves in 24 hours are cancelled automatically, returning their kg to stock.
 - Pack, dispatch and deliver orders. Cancel before packing, with a reason.
-- **AI inspection:** record or upload a short video (or photo) of each box at packing.
+- **AI inspection:** record with the live camera (up to 20 seconds), take a photo, or upload a video or photo of each box at packing.
 - Print a QR label for each checked box.
-- Upload short harvest videos for customers. Each video is removed within 3 days.
+- Upload harvest videos for customers (shown on the home page the same day and on the orchard page for 7 days). Each orchard can keep up to 7 videos; when the oldest is over 30 days old, the seller is reminded to remove old ones.
 - **Decide on problem reports** about their own orders: refund, send a new box, or not approved (with a reason for the customer). Then mark the refund or new box as done.
 
 ### Admin
@@ -82,6 +82,19 @@ A day-by-day record of this work is in [JOURNAL.md](JOURNAL.md).
   - order tracking, cancelling, delivery confirmation, reviews, problem reports with up to 2 photos, and the notification bell;
   - the redesign of the customer pages.
 - **AI inspection:** trained the YOLOv8n model on Kaggle and evaluated it; built in-browser detection for photos and videos with mango tracking, Cloudinary video storage, and the "AI check of your box" view for customers and admins.
+
+## Contributions by Payel Saha ([@ps3107](https://github.com/ps3107))
+
+- **Front-end design:** redesigned the home page and the login and sign-up pages; built the first versions of the customer and seller dashboards, with mango variety photos.
+- **QR box verification:**
+  - a unique code for every checked box (for example `ORC-8F2A1B-7K9M`);
+  - the seller's QR labels page, where each label can be printed or downloaded;
+  - the public verification page that opens when a box is scanned. It shows the scan count, the AI result, the orchard and variety, the order details and the delivery journey.
+- **Orchard media:**
+  - the seller's page for uploading harvest videos straight to Cloudinary, and for removing them;
+  - the limit of 7 videos per orchard, and a reminder on the dashboard and in notifications when the oldest video is over 30 days old;
+  - showing the videos to customers on the home page and orchard pages.
+- **Live camera for AI inspection:** sellers can inspect a box with the phone or laptop camera, recording a video of up to 20 seconds or taking a photo, without leaving the page.
 
 ## Getting started
 
