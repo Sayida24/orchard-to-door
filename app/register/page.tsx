@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function RegisterPage() {
   return (
-    <main className="min-h-screen bg-[#FFF9EC] px-4 py-8 sm:py-12">
+    <main className="orchard-leaf-bg min-h-screen bg-[#FFF9EC] px-4 py-8 sm:py-12">
       <div className="mx-auto grid w-full max-w-5xl overflow-hidden rounded-3xl border border-[#EDE5D5] bg-white shadow-xl md:grid-cols-2">
 
         {/* Left branding section */}

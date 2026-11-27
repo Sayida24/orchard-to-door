@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "Forgot password · Orchiva" };
 
 export default function ForgotPasswordPage() {
   return (
-    <main className="flex flex-1 items-start justify-center bg-stone-50 px-4 py-10 sm:py-16">
+    <main className="orchard-leaf-bg flex flex-1 items-start justify-center bg-stone-50 px-4 py-10 sm:py-16">
       <div className={`${ui.card} w-full max-w-md p-6 sm:p-8`}>
         <p className="text-3xl">🔑</p>
         <h1 className="mt-2 text-2xl font-bold text-stone-900">Forgot your password?</h1>

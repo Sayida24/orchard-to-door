@@ -49,7 +49,7 @@ const steps = [
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-[#FFFDF7]">
+    <main className="orchard-leaf-bg min-h-screen bg-[#FFFDF7]">
       {/* Hero section */}
       <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-14 sm:px-6 sm:py-20 md:grid-cols-2">
         <div>

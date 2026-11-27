@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function ResetPasswordPage({ searchParams }: PageProps<"/reset-password">) {
   return (
-    <main className="flex flex-1 items-start justify-center bg-stone-50 px-4 py-10 sm:py-16">
+    <main className="orchard-leaf-bg flex flex-1 items-start justify-center bg-stone-50 px-4 py-10 sm:py-16">
       <div className={`${ui.card} w-full max-w-md p-6 sm:p-8`}>
         <p className="text-3xl">🔒</p>
         <h1 className="mb-4 mt-2 text-2xl font-bold text-stone-900">Choose a new password</h1>
