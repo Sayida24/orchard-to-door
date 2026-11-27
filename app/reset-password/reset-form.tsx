@@ -1,12 +1,33 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useEffect, useSyncExternalStore } from "react";
 import { ui } from "@/lib/ui";
 import { MIN_PASSWORD } from "@/lib/validation";
 import { resetPassword, type ResetState } from "./actions";
 
-export function ResetForm({ token, name }: { token: string; name: string }) {
+// A Supabase Auth reset link lands here as /reset-password#access_token=…&type=recovery
+// (or #error=… when it has expired). Only the browser can read the part after "#".
+let linkHash: string | null = null;
+const readLinkHash = () => (linkHash ??= window.location.hash.slice(1));
+const noSubscribe = () => () => {};
+
+export function SupabaseReset() {
+  const hash = useSyncExternalStore(noSubscribe, readLinkHash, () => null);
+  const params = new URLSearchParams(hash ?? "");
+  const accessToken = params.get("type") === "recovery" ? params.get("access_token") : null;
+
+  // Take the key out of the address bar and browser history once it has been read.
+  useEffect(() => {
+    if (window.location.hash) history.replaceState(null, "", window.location.pathname);
+  }, []);
+
+  if (hash === null) return <div className="h-56" />;
+  if (!accessToken) return <ExpiredNotice />;
+  return <ResetForm accessToken={accessToken} />;
+}
+
+export function ResetForm({ token, accessToken, name }: { token?: string; accessToken?: string; name?: string }) {
   const [state, action, pending] = useActionState<ResetState, FormData>(resetPassword, undefined);
 
   if (state?.done) {
@@ -28,9 +49,10 @@ export function ResetForm({ token, name }: { token: string; name: string }) {
   return (
     <form action={action} className="space-y-4">
       <p className="text-sm text-stone-600">
-        Hi {name}, choose a new password for your account.
+        {name ? `Hi ${name}, choose` : "Choose"} a new password for your account.
       </p>
-      <input type="hidden" name="token" value={token} />
+      {token && <input type="hidden" name="token" value={token} />}
+      {accessToken && <input type="hidden" name="accessToken" value={accessToken} />}
       <div>
         <label htmlFor="password" className={ui.label}>
           New password

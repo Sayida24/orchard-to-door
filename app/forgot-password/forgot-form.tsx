@@ -15,7 +15,7 @@ export function ForgotForm() {
           <p className="font-semibold">Check your email</p>
           <p className="mt-1">
             If an account with that phone number or email has an email address, we&apos;ve sent it a reset link.
-            The link expires in 30 minutes.
+            The link works once and expires within an hour. Check your spam folder if you don&apos;t see it.
           </p>
         </div>
         <div className="rounded-2xl bg-stone-50 p-4 text-sm leading-6 text-stone-700">
